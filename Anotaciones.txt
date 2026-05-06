@@ -1,0 +1,6 @@
+- Costos a tener en cuenta:
+	.Servidores host
+	.BD
+	.Dominio
+	.Backups
+	.Búsquedas con IA

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm list *)",
+      "Bash(npm root *)",
+      "Bash(npm install *)",
+      "Bash(node build-data.js)",
+      "Bash(node -e ' *)",
+      "Bash(start \"\" \"dashboard/index.html\")",
+      "Bash(timeout 3)",
+      "Bash(winget show *)",
+      "Bash(where gh *)",
+      "Bash(git config *)"
+    ]
+  }
+}
