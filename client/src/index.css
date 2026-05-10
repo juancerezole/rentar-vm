@@ -4,9 +4,9 @@
 
 html, body, #root { height: 100%; }
 body {
-  font-family: 'Sora', system-ui, sans-serif;
-  background: #F7F8F6;
-  color: #1C221C;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #F7F9FC;
+  color: #2B2F33;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'cv11';
 }
@@ -18,7 +18,7 @@ body {
 .animate-fadeIn { animation: fadeIn .25s ease-out; }
 
 .scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #cdd3cd; border-radius: 4px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #C8CDD3; border-radius: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 
 .line-clamp-1 {
