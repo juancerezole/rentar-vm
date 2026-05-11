@@ -19,7 +19,7 @@ export default function AdBanner() {
   const b = banners[idx];
 
   return (
-    <div className="bg-brand-mid text-white">
+    <div className="bg-brand-mid dark:bg-night-elevated text-white">
       <div className="max-w-7xl mx-auto px-4 h-12 flex items-center gap-4 relative">
         <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40 border border-white/20 px-2 py-0.5 rounded shrink-0">
           Publicidad
@@ -29,7 +29,7 @@ export default function AdBanner() {
           <div className="font-semibold text-[13px] truncate">{b.titulo}</div>
           {b.subtitulo && <div className="text-[11px] text-white/50 truncate hidden sm:block">{b.subtitulo}</div>}
         </div>
-        <button className="text-[11px] font-semibold tracking-wide text-white border border-white/30 hover:bg-white/10 hover:border-white/55 px-3 py-1.5 rounded-lg transition shrink-0">
+        <button className="text-[11px] font-semibold text-white border border-white/30 hover:bg-white/10 hover:border-white/55 px-3 py-1.5 rounded-lg transition shrink-0">
           Contactar
         </button>
         {banners.length > 1 && (

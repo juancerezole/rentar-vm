@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
@@ -37,11 +38,22 @@ export default {
           200: '#E1E5EA',
           100: '#F0F3F6',
         },
+        // Dark mode palette — azul oscuro profundo + naranja como contraste
+        night: {
+          bg:       '#09131F', // Fondo global
+          card:     '#0D1E30', // Cards y superficies
+          elevated: '#132538', // Header, modales, inputs
+          border:   '#1A3350', // Bordes
+          text:     '#E4EFF8', // Texto principal
+          muted:    '#6A9AB8', // Texto secundario
+          dim:      '#364F63', // Texto muy apagado / placeholders
+        },
       },
       boxShadow: {
-        soft: '0 1px 4px rgba(0,0,0,0.06)',
-        card: '0 4px 20px rgba(30,58,95,0.08)',
-        lg: '0 8px 32px rgba(30,58,95,0.12)',
+        soft:   '0 1px 4px rgba(0,0,0,0.06)',
+        card:   '0 4px 20px rgba(30,58,95,0.08)',
+        lg:     '0 8px 32px rgba(30,58,95,0.12)',
+        'dark-card': '0 4px 24px rgba(0,0,0,0.40)',
       },
     },
   },

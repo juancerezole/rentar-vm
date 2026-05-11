@@ -10,7 +10,7 @@ import PropertyDetail from './pages/PropertyDetail.jsx';
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="p-8 text-center text-ink-400">Cargando...</div>;
+  if (loading) return <div className="p-8 text-center text-ink-400 dark:text-night-dim">Cargando...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.rol)) return <Navigate to="/" replace />;
   return children;
@@ -18,7 +18,7 @@ function Protected({ children, roles }) {
 
 export default function App() {
   return (
-    <div className="min-h-full bg-surface">
+    <div className="min-h-full bg-surface dark:bg-night-bg">
       <Header />
       <Routes>
         <Route path="/" element={<Home />} />
@@ -40,7 +40,7 @@ export default function App() {
 
 function Footer() {
   return (
-    <footer className="bg-brand text-white mt-16">
+    <footer className="bg-brand dark:bg-night-elevated text-white mt-16">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
           <div className="col-span-2 md:col-span-1">

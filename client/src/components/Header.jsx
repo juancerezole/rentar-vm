@@ -1,6 +1,7 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Home, LogIn, LogOut, UserPlus, LayoutDashboard, Shield, Building2, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import ThemeToggle from './ThemeToggle.jsx';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -14,7 +15,7 @@ export default function Header() {
     }`;
 
   return (
-    <header className="sticky top-0 z-30 bg-brand shadow-soft">
+    <header className="sticky top-0 z-30 bg-brand dark:bg-night-elevated shadow-soft">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
         <Link to="/" className="flex items-center gap-2.5 shrink-0">
           <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white">
@@ -51,18 +52,21 @@ export default function Header() {
           )}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5">
+          <ThemeToggle />
+
           {(user?.rol === 'inmobiliaria' || user?.rol === 'admin') && (
             <Link
               to="/panel-inmobiliaria"
-              className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold bg-white text-brand hover:bg-white/90 px-3.5 py-2 rounded-lg transition shadow-soft"
+              className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold bg-white dark:bg-accent-orange text-brand dark:text-white hover:bg-white/90 dark:hover:bg-accent-orange/90 px-3.5 py-2 rounded-lg transition shadow-soft ml-1"
             >
               <Plus className="w-4 h-4" /> Publicar
             </Link>
           )}
+
           {user ? (
             <>
-              <div className="hidden sm:flex flex-col items-end leading-tight">
+              <div className="hidden sm:flex flex-col items-end leading-tight ml-1">
                 <span className="text-sm font-semibold text-white">{user.nombre}</span>
                 <span className="text-[10px] text-white/45 capitalize">{user.rol}</span>
               </div>
@@ -83,7 +87,7 @@ export default function Header() {
               </Link>
               <Link
                 to="/register"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-brand-mid text-white hover:bg-brand-mid/90 transition shadow-soft"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold bg-brand-mid dark:bg-accent-orange text-white hover:bg-brand-mid/90 dark:hover:bg-accent-orange/90 transition shadow-soft"
               >
                 <UserPlus className="w-4 h-4" /> Registrarse
               </Link>
