@@ -1,9 +1,28 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
+import rateLimit from 'express-rate-limit';
 import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { authRequired, signToken } from '../middleware/auth.js';
+
+// Almacenamiento en memoria — aceptable para un solo servidor.
+// Al escalar a múltiples instancias, reemplazar con RedisStore.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos. Esperá 15 minutos e intentá de nuevo.' },
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados registros desde esta IP. Esperá 1 hora.' },
+});
 
 const router = Router();
 const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
@@ -17,7 +36,7 @@ const PUBLIC_FIELDS = {
   telefono: users.telefono,
 };
 
-router.post('/register', wrap(async (req, res) => {
+router.post('/register', registerLimiter, wrap(async (req, res) => {
   const { nombre, email, password, rol = 'usuario', empresa, telefono } = req.body || {};
   if (!nombre || !email || !password) return res.status(400).json({ error: 'faltan campos' });
   if (!['usuario', 'inmobiliaria'].includes(rol)) return res.status(400).json({ error: 'rol invalido' });
@@ -37,7 +56,7 @@ router.post('/register', wrap(async (req, res) => {
   res.json({ token: signToken(user), user });
 }));
 
-router.post('/login', wrap(async (req, res) => {
+router.post('/login', loginLimiter, wrap(async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'faltan campos' });
 
