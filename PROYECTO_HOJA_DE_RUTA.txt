@@ -1,0 +1,891 @@
+================================================================================
+  RENTAR VM — HOJA DE RUTA Y ESTADO DEL PROYECTO
+  Fecha: Mayo 2026 | Autor: Equipo Rentar
+  Este documento es la referencia técnica y estratégica del proyecto.
+  Actualizarlo cada vez que se tome una decisión relevante.
+================================================================================
+
+
+────────────────────────────────────────────────────────────────────────────────
+1. QUÉ ES EL PROYECTO
+────────────────────────────────────────────────────────────────────────────────
+
+Rentar es un portal inmobiliario de alquileres con foco inicial en Villa María,
+Córdoba, con expansión planificada a otras ciudades de la provincia.
+
+MODELO DE NEGOCIO:
+  - Ingresos por publicidad: banners vendidos a inmobiliarias, bancos, empresas
+    de servicios (mudanzas, constructoras, etc.)
+  - El volumen de tráfico orgánico es la métrica clave del negocio. Sin tráfico,
+    no hay valor para los anunciantes.
+  - Secundariamente: destacados/publicaciones premium para inmobiliarias.
+
+USUARIOS OBJETIVO:
+  - Personas que buscan alquilar (visitantes / usuarios registrados)
+  - Inmobiliarias que publican propiedades (requieren cuenta)
+  - Anunciantes que contratan banners (gestionados por admin)
+  - Administradores del portal
+
+ALCANCE ACTUAL: Villa María (demo/MVP).
+ALCANCE PRÓXIMO: Múltiples ciudades de Córdoba.
+
+
+────────────────────────────────────────────────────────────────────────────────
+2. ESTADO TÉCNICO ACTUAL (Mayo 2026)
+────────────────────────────────────────────────────────────────────────────────
+
+STACK TECNOLÓGICO ACTUAL:
+  Frontend:
+    - React 18 (SPA)
+    - Vite (bundler, puerto 5173 en dev)
+    - React Router v6
+    - Tailwind CSS (con dark mode por clase)
+    - Axios (cliente HTTP)
+    - Lucide React (íconos)
+
+  Backend:
+    - Node.js con ES Modules
+    - Express 4 (puerto 4000)
+    - node:sqlite (módulo nativo experimental de Node.js) ← DEBE CAMBIAR
+    - JWT (jsonwebtoken) — tokens de 7 días
+    - bcryptjs (hashing de passwords)
+    - cors + dotenv
+
+  Base de datos: SQLite (archivo database.sqlite local) ← DEBE CAMBIAR
+  Imágenes: URLs de texto libre (Unsplash como placeholder) ← DEBE CAMBIAR
+  Deploy: ninguno (solo local) ← PENDIENTE
+
+ESTRUCTURA DE ARCHIVOS:
+  /client
+    /src
+      /pages        → Home, Login, Register, PropertyDetail,
+                       InmobiliariaDashboard, AdminDashboard
+      /components   → PropertyCard, Filters, AISearchBar, HeatMap,
+                       NeighborhoodMap, Calculadora, Oportunidades,
+                       StatsBar, AdBanner, Header, SectionTabs, ThemeToggle
+      /context      → AuthContext.jsx, ThemeContext.jsx
+      api.js        → instancia axios + helpers
+  /server
+    index.js        → entrada, configuración Express
+    db.js           → schema, migraciones, seeds
+    /routes
+      auth.js       → POST /register, /login | GET /me
+      properties.js → CRUD propiedades + AI search
+      misc.js       → barrios, heatmap, banners, stats, admin users
+    /middleware
+      auth.js       → signToken, authRequired, requireRole, optionalAuth
+
+ENDPOINTS ACTUALES:
+  POST  /api/auth/register
+  POST  /api/auth/login
+  GET   /api/auth/me
+
+  GET   /api/properties              (filtros por query params)
+  POST  /api/properties/ai-search    (búsqueda en lenguaje natural)
+  GET   /api/properties/cheapest-by-barrio
+  GET   /api/properties/mine/list    (auth: inmobiliaria/admin)
+  GET   /api/properties/:id
+  POST  /api/properties              (auth: inmobiliaria/admin)
+  PUT   /api/properties/:id          (auth: dueño o admin)
+  DELETE /api/properties/:id         (auth: dueño o admin)
+
+  GET   /api/barrios
+  GET   /api/barrios/heatmap
+  GET   /api/banners
+  GET   /api/profesionales
+  GET   /api/stats/summary
+
+  GET   /api/admin/users             (auth: admin)
+  PUT   /api/admin/users/:id/rol     (auth: admin)
+  DELETE /api/admin/users/:id        (auth: admin)
+
+SCHEMA DE BASE DE DATOS ACTUAL:
+  users        → id, nombre, email, password_hash, rol, empresa, telefono, created_at
+  barrios      → id, nombre, x, y, precio_mes_anterior
+  properties   → id, user_id, titulo, tipo, direccion, barrio, precio,
+                  precio_anterior, ambientes, banos, superficie, garantia,
+                  mascotas, amoblado, expensas_incluidas, destacado,
+                  liquidacion, descripcion, imagen, created_at
+  banners      → id, titulo, subtitulo, color, link, activo
+  profesionales → id, nombre, rol, matricula, rating, iniciales, color,
+                  telefono, email
+
+FUNCIONALIDADES IMPLEMENTADAS:
+  ✓ Listado de propiedades con 10+ filtros simultáneos
+  ✓ Buscador en lenguaje natural (regex + diccionarios, sin LLM externo)
+  ✓ Mapa de barrios interactivo (SVG)
+  ✓ Mapa de calor de precios por barrio con delta % mensual
+  ✓ Sección Oportunidades / Liquidaciones
+  ✓ Calculadora de costos de alquiler
+  ✓ Barra de estadísticas del portal
+  ✓ Banners publicitarios rotativos
+  ✓ Página de detalle de propiedad
+  ✓ Autenticación JWT con 3 roles (usuario, inmobiliaria, admin)
+  ✓ Dashboard de inmobiliaria: CRUD completo de propiedades
+  ✓ Dashboard de admin: gestión de usuarios y roles
+  ✓ Dark mode
+  ✓ Diseño responsive
+
+FUNCIONALIDADES PENDIENTES O INCOMPLETAS:
+  ✗ Subida real de imágenes (actualmente solo URL de texto)
+  ✗ Paginación de propiedades (devuelve todo sin límite)
+  ✗ Recupero de contraseña por email
+  ✗ Panel de gestión de banners en admin (solo existe en seed)
+  ✗ Tracking de impresiones y clics en banners
+  ✗ Analytics de tráfico (GA4, Meta Pixel)
+  ✗ SEO (sin meta tags dinámicas, sin sitemap, sin datos estructurados)
+  ✗ Rate limiting en endpoints de autenticación
+  ✗ Validación de inputs (mínima actualmente)
+  ✗ Multi-ciudad (modelo de datos solo soporta una ciudad)
+  ✗ Alertas por WhatsApp (botón existe en UI, sin lógica)
+  ✗ Deploy en producción
+  ✗ Emails transaccionales
+
+
+────────────────────────────────────────────────────────────────────────────────
+3. ESTRATEGIA DE RAMAS GIT — GITFLOW SIMPLIFICADO
+────────────────────────────────────────────────────────────────────────────────
+
+RAMAS PERMANENTES:
+
+  main (= producción)
+    - Es la rama que corre en el servidor de producción.
+    - NUNCA se hace commit directo aquí.
+    - Solo recibe merges desde staging (después de aprobar).
+    - Cada merge a main debe estar etiquetado con una versión (git tag v1.0.0).
+    - Regla: si algo está en main, está en vivo para usuarios reales.
+
+  staging (= preproducción / QA)
+    - Es una copia fiel de producción con datos de prueba.
+    - Aquí se prueban los cambios antes de subir a main.
+    - Solo recibe merges desde develop (o hotfix).
+    - Corre en un entorno separado (Railway staging environment, por ej.).
+    - Regla: todo lo que va a main pasó primero por staging.
+
+  develop (= integración)
+    - Es la rama de trabajo diario.
+    - Aquí se integran las features terminadas.
+    - Las ramas de feature y fix salen de aquí y vuelven aquí.
+    - Regla: develop puede estar "roto" puntualmente, staging no.
+
+RAMAS TEMPORALES (se crean y se borran):
+
+  feature/nombre-de-la-feature
+    Ejemplos:
+      feature/multi-ciudad
+      feature/upload-imagenes-cloudinary
+      feature/panel-banners-admin
+      feature/google-analytics
+    - Sale de: develop
+    - Se mergea a: develop
+    - Se borra después del merge.
+
+  fix/descripcion-del-bug
+    Ejemplos:
+      fix/paginacion-propiedades
+      fix/rate-limiting-auth
+    - Sale de: develop
+    - Se mergea a: develop
+
+  hotfix/descripcion
+    Ejemplos:
+      hotfix/login-roto-en-prod
+    - Sale de: main (porque el bug está en producción)
+    - Se mergea a: main Y a develop (para no perder el fix)
+    - Solo para bugs críticos que no pueden esperar el ciclo normal.
+
+FLUJO ESTÁNDAR DE TRABAJO:
+  1. Crear rama: git checkout develop && git pull && git checkout -b feature/mi-feature
+  2. Desarrollar y hacer commits frecuentes en la rama.
+  3. Cuando está lista: PR de feature/mi-feature → develop
+  4. Code review (aunque seas solo, revisá el diff antes de mergear).
+  5. Merge a develop.
+  6. Cuando develop acumula suficientes features: PR develop → staging.
+  7. Testear en staging (funcionalidad, mobile, dark mode, etc.).
+  8. Si todo ok: PR staging → main + tag de versión.
+  9. Deploy automático desde main.
+
+CONVENCIÓN DE COMMITS (Conventional Commits):
+  feat: agrega nueva funcionalidad
+  fix: corrige un bug
+  chore: tarea de mantenimiento (deps, configs)
+  refactor: cambio de código sin nueva feature ni fix
+  docs: cambios en documentación
+  style: cambios de estilo/formato sin lógica
+  test: agrega o modifica tests
+
+  Ejemplos:
+    feat: agrega paginación a GET /api/properties
+    fix: corrige validación de email en registro
+    chore: actualiza dependencias de seguridad
+    feat(admin): agrega panel de gestión de banners
+
+TAGS DE VERSIÓN (SemVer: MAJOR.MINOR.PATCH):
+  MAJOR → cambio que rompe compatibilidad (raro en frontend)
+  MINOR → nueva funcionalidad agregada
+  PATCH → bug fix
+
+  Ejemplos: v1.0.0 (lanzamiento), v1.1.0 (multi-ciudad), v1.1.1 (fix de bug)
+
+
+────────────────────────────────────────────────────────────────────────────────
+4. DECISIONES QUE HAY QUE TOMAR ANTES DEL LANZAMIENTO
+────────────────────────────────────────────────────────────────────────────────
+
+Estas son las decisiones que definen la arquitectura del proyecto.
+Tomarlas tarde tiene costo alto de refactoring.
+
+────────────────────────────
+4.1 BASE DE DATOS → PostgreSQL
+────────────────────────────
+
+PROBLEMA ACTUAL:
+  node:sqlite es experimental y sincrónico. No es apto para producción
+  en servidores compartidos o PaaS. SQLite no soporta bien escrituras
+  concurrentes de múltiples inmobiliarias simultáneas.
+
+DECISIÓN: Migrar a PostgreSQL.
+
+OPCIÓN RECOMENDADA: Railway (Postgres managed)
+  - Incluye backups automáticos.
+  - Escala sin cambiar código.
+  - Se integra con el mismo proyecto donde va el backend Node.js.
+  - Alternativa: Supabase (PostgreSQL hosteado, tiene SDK propio, buena
+    opción si en el futuro se quiere agregar realtime).
+
+LIBRERÍA: pg (node-postgres) + sql puro, O Drizzle ORM.
+  - Drizzle ORM es recomendado para equipos pequeños: type-safe,
+    esquema en código, migraciones declarativas, sin magia excesiva.
+  - Impacto: todas las queries del backend pasan de síncronas a async/await.
+
+IMPACTO EN EL CÓDIGO:
+  - Reescribir db.js (schema + seeds)
+  - Todas las rutas pasan a ser async
+  - Los middleware de auth son async
+  Estimación: 1-2 días de trabajo.
+
+────────────────────────────
+4.2 MODELO DE DATOS → MULTI-CIUDAD
+────────────────────────────
+
+PROBLEMA ACTUAL:
+  La tabla barrios no tiene referencia a ciudad. Las propiedades tampoco.
+  Agregar ciudades después de tener datos reales es costoso.
+
+DECISIÓN: Agregar ciudades al modelo desde ahora.
+
+SCHEMA A AGREGAR:
+  ciudades:
+    id, nombre, provincia, slug (ej: "villa-maria"), activa (boolean),
+    created_at
+
+  CAMBIOS EN TABLAS EXISTENTES:
+    barrios  → agregar ciudad_id (FK → ciudades.id)
+    properties → ya tiene "barrio" como texto; con multi-ciudad conviene
+                 agregar ciudad_id directo a properties para búsquedas más
+                 eficientes. Evaluar según volumen.
+
+IMPACTO EN FRONTEND:
+  - El selector de ciudad en la home (actualmente inexistente).
+  - La URL debería reflejar la ciudad: /villa-maria/alquileres
+    (importante para SEO — ver sección 7).
+  - Los barrios del dropdown de filtros cambian según ciudad seleccionada.
+
+────────────────────────────
+4.3 IMÁGENES → CLOUDINARY
+────────────────────────────
+
+PROBLEMA ACTUAL:
+  Las inmobiliarias necesitan subir fotos reales. El formulario solo
+  acepta una URL de texto. No hay storage.
+
+DECISIÓN: Cloudinary para almacenamiento y procesamiento de imágenes.
+
+POR QUÉ CLOUDINARY:
+  - Free tier: 25 GB storage + 25 GB bandwidth/mes (suficiente para empezar).
+  - Upload directo desde el browser (sin pasar por el servidor Node.js).
+  - Transforma imágenes automáticamente (resize, compresión, WebP).
+  - CDN incluida (las imágenes cargan rápido desde cualquier lugar).
+
+IMPLEMENTACIÓN:
+  - Backend: solo recibe la URL de Cloudinary ya subida, no maneja el
+    archivo binario. Esto es importante: no satura el servidor Express.
+  - Frontend: widget de Cloudinary o fetch directo a su API.
+  - Variables de entorno a agregar: CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.
+
+MÚLTIPLES FOTOS:
+  Actualmente properties.imagen es un solo TEXT.
+  Para múltiples fotos: crear tabla property_images (id, property_id,
+  url, orden) o guardar un array JSON en postgres.
+  Decisión: evaluar cuántas fotos necesitan las inmobiliarias.
+
+────────────────────────────
+4.4 HOSTING Y DEPLOY
+────────────────────────────
+
+ARQUITECTURA DE DEPLOY RECOMENDADA:
+
+  Frontend (cliente React):
+    Plataforma: Vercel
+    Por qué: gratis para proyectos públicos, deploys automáticos desde
+    git (push a main = deploy a producción, push a staging = preview),
+    CDN global incluida, HTTPS automático, manejo de variables de entorno.
+
+  Backend (servidor Node.js + Express):
+    Plataforma: Railway
+    Por qué: incluye Node.js + PostgreSQL en el mismo lugar, $5/mes,
+    variables de entorno, logs en tiempo real, deploys desde git.
+    Alternativa: Render (tiene tier gratuito pero duerme si no hay tráfico).
+
+  Base de datos: Railway Postgres (junto con el backend) o Supabase.
+
+  Imágenes: Cloudinary (CDN propio, no requiere servidor).
+
+  DOMINIO:
+    rentar.com.ar o rentar-vm.com.ar (a definir).
+    Configurar en Vercel para el frontend.
+
+  VARIABLES DE ENTORNO POR ENTORNO:
+    .env.development  → local
+    .env.staging      → entorno de staging
+    .env.production   → producción
+    Nunca commitear archivos .env con secretos reales.
+
+  CI/CD (opcional al principio, importante al escalar):
+    GitHub Actions: workflow que corre al hacer push a cada rama.
+    - En develop: corre linter + tests.
+    - En staging: deploy automático a entorno staging.
+    - En main: deploy automático a producción.
+
+
+────────────────────────────────────────────────────────────────────────────────
+5. ANALYTICS DE TRÁFICO Y CAMPAÑAS PUBLICITARIAS
+────────────────────────────────────────────────────────────────────────────────
+
+Este es el área más crítica para el modelo de negocio. Sin métricas no
+hay forma de cobrar publicidad ni optimizar el tráfico.
+
+────────────────────────────
+5.1 GOOGLE ANALYTICS 4 (GA4)
+────────────────────────────
+
+QUÉ ES: La herramienta estándar de Google para medir tráfico web.
+COSTO: Gratuito.
+
+QUÉ MIDE POR DEFECTO:
+  - Sesiones, usuarios únicos, páginas vistas.
+  - Fuente de tráfico (orgánico Google, directo, redes sociales, etc.).
+  - Dispositivo (mobile vs desktop).
+  - Ubicación geográfica del usuario.
+  - Tiempo en página, tasa de rebote.
+
+EVENTOS PERSONALIZADOS A IMPLEMENTAR:
+  - property_view: cada vez que alguien abre una propiedad (+ ciudad, tipo, precio).
+  - search_performed: cada búsqueda (+ términos, ciudad, filtros).
+  - contact_click: cuando alguien clickea "Solicitar información" (dato de valor
+    para las inmobiliarias).
+  - banner_impression: cuando un banner es visible.
+  - banner_click: cuando alguien clickea un banner.
+  - whatsapp_alert_set: cuando alguien configura una alerta.
+
+CÓMO IMPLEMENTAR:
+  Opción A (recomendada): Google Tag Manager (ver sección 5.3).
+  Opción B: instalar gtag.js directo en index.html del cliente.
+
+  Código base a agregar en client/index.html:
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+
+────────────────────────────
+5.2 META PIXEL (Facebook / Instagram)
+────────────────────────────
+
+QUÉ ES: El sistema de tracking de Meta para medir visitas y conversiones
+provenientes de Facebook e Instagram, y para crear audiencias de remarketing.
+
+COSTO: Gratuito (es una herramienta de Meta Ads).
+
+POR QUÉ ES IMPORTANTE:
+  - Permite crear campañas en Meta que apunten exactamente a personas
+    que ya visitaron Rentar (remarketing = mayor conversión).
+  - Permite crear "audiencias similares" (lookalike) a los visitantes actuales.
+  - Mide cuántas visitas al sitio vienen de campañas en Instagram/Facebook.
+  - Con suficiente data, Meta optimiza automáticamente a quién mostrarle los ads.
+
+EVENTOS ESTÁNDAR DE META A IMPLEMENTAR:
+  - PageView (automático)
+  - ViewContent: al ver una propiedad (con precio, ciudad, tipo como parámetros)
+  - Search: al realizar una búsqueda
+  - Lead: cuando alguien hace click en "Solicitar información" o configura alerta
+
+CÓMO IMPLEMENTAR:
+  Via Google Tag Manager (recomendado, ver sección 5.3).
+  El pixel de Meta se agrega como tag en GTM. ID del pixel: se obtiene
+  en business.facebook.com al crear el pixel.
+
+META CONVERSIONS API (server-side):
+  Para mayor precisión con usuarios que bloquean cookies o usan iOS 14+.
+  Envía eventos directamente desde el servidor Node.js a Meta.
+  Requiere: META_ACCESS_TOKEN en variables de entorno.
+  Implementación futura: cuando el volumen de tráfico lo justifique.
+
+────────────────────────────
+5.3 GOOGLE TAG MANAGER (GTM)
+────────────────────────────
+
+QUÉ ES: Un sistema que permite instalar y gestionar todos los scripts de
+tracking (GA4, Meta Pixel, LinkedIn, TikTok Pixel, etc.) sin tocar el
+código fuente cada vez.
+
+POR QUÉ ES LA FORMA CORRECTA DE HACERLO:
+  - Una sola instalación en el código (el contenedor de GTM).
+  - Todos los demás tags (GA4, Meta, etc.) se configuran en la interfaz web
+    de GTM, sin deploys.
+  - Si en el futuro quieren agregar LinkedIn Insight Tag o TikTok Pixel,
+    se hace en minutos desde GTM sin tocar código.
+  - Permite a un marketer configurar eventos sin depender del desarrollador.
+
+IMPLEMENTACIÓN:
+  Agregar en client/index.html el snippet del contenedor GTM.
+  ID del contenedor: GTM-XXXXXXX (se crea en tagmanager.google.com).
+
+  En GTM, crear:
+    - Tag: GA4 Configuration (con el ID de medición G-XXXXXXXX)
+    - Tag: Meta Pixel (con el ID del pixel)
+    - Triggers: PageView, eventos personalizados de React
+    - Variables: dataLayer variables para capturar datos del contexto
+
+  DataLayer en React:
+    Crear un hook useAnalytics() que haga push al dataLayer de GTM.
+    Ejemplo:
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ event: 'property_view', property_id: 42,
+        city: 'villa-maria', price: 280000 });
+
+────────────────────────────
+5.4 GOOGLE SEARCH CONSOLE
+────────────────────────────
+
+QUÉ ES: Herramienta gratuita de Google para monitorear cómo aparece
+el sitio en los resultados de búsqueda orgánica.
+
+COSTO: Gratuito.
+
+QUÉ PERMITE:
+  - Ver qué búsquedas llevan tráfico al sitio ("alquiler Villa María",
+    "departamentos en Córdoba", etc.).
+  - Ver posición promedio en Google para cada keyword.
+  - Detectar errores de indexación.
+  - Enviar el sitemap a Google.
+
+CUÁNDO CONFIGURAR: antes del lanzamiento en producción.
+REQUIERE: verificar la propiedad en el dominio (DNS o meta tag).
+
+
+────────────────────────────────────────────────────────────────────────────────
+6. SEO — CRÍTICO PARA EL OBJETIVO DE TRÁFICO
+────────────────────────────────────────────────────────────────────────────────
+
+El SEO es la principal fuente de tráfico orgánico para un portal inmobiliario.
+Las personas buscan "alquiler departamento Villa María" en Google.
+Si Rentar no aparece, no hay tráfico. Sin tráfico, no hay modelo de negocio.
+
+SITUACIÓN ACTUAL:
+  El sitio es una SPA (Single Page Application) con React.
+  Una SPA pura tiene SEO limitado porque el HTML inicial que ve Google
+  está casi vacío — el contenido lo genera JavaScript en el browser.
+  Google puede ejecutar JavaScript, pero lo hace con retraso y limitaciones.
+
+────────────────────────────
+6.1 MEJORAS INMEDIATAS (sin cambiar arquitectura)
+────────────────────────────
+
+  a) Meta tags dinámicas por página:
+     Instalar: react-helmet-async
+     En cada página, setear:
+       <title>Departamentos en alquiler en Villa María | Rentar</title>
+       <meta name="description" content="..." />
+       <meta property="og:title" content="..." />
+       <meta property="og:image" content="..." />
+       <meta property="og:url" content="..." />
+     En PropertyDetail: usar el título y foto de la propiedad.
+
+  b) Datos estructurados (Schema.org / JSON-LD):
+     Google muestra rich results (precio, fotos) para propiedades con
+     markup de schema.org. Agregar en PropertyDetail:
+       <script type="application/ld+json">
+         { "@type": "RealEstateListing", "name": ..., "price": ..., ... }
+       </script>
+
+  c) Sitemap XML:
+     Archivo /sitemap.xml con todas las URLs de propiedades.
+     Generarlo dinámicamente desde el servidor Express.
+     Enviarlo a Google Search Console.
+
+  d) robots.txt:
+     Archivo básico que le dice a Google qué indexar.
+
+  e) URLs amigables con ciudad:
+     Cambiar de /propiedad/42 a /villa-maria/alquiler/departamento-2-amb-centro-42
+     Esto es un cambio importante pero muy valioso para SEO.
+     Prioridad: alta, pero puede hacerse en la primera iteración post-lanzamiento.
+
+────────────────────────────
+6.2 DECISIÓN ARQUITECTÓNICA: SPA vs SSR vs SSG
+────────────────────────────
+
+OPCIONES:
+
+  A) Mantener SPA con mejoras de meta tags (situación actual mejorada)
+     PRO: sin cambios de arquitectura, desarrollo más rápido.
+     CONTRA: Google indexa con retraso, competidores con SSR ranquean mejor.
+     RECOMENDADO PARA: lanzamiento inicial, mientras se valida el negocio.
+
+  B) Migrar a Next.js (SSR / SSG)
+     PRO: SEO óptimo, cada propiedad tiene su HTML pre-renderizado,
+          Google lo indexa perfectamente, carga más rápida (Core Web Vitals).
+     CONTRA: migración de 2-3 semanas de trabajo, más complejidad.
+     RECOMENDADO PARA: cuando el tráfico orgánico sea una prioridad estratégica
+                       y el negocio esté validado.
+     NOTA: es la decisión de arquitectura más grande del proyecto.
+           Si se decide hacer, hacerlo ANTES de tener mucho código de frontend.
+
+  C) Prerendering (react-snap, prerender.io)
+     PRO: sin cambiar a Next.js, genera HTML estático de las páginas.
+     CONTRA: no funciona bien para páginas dinámicas como listados de propiedades.
+     RECOMENDADO PARA: no aplicable en este caso.
+
+RECOMENDACIÓN: Arrancar con A (SPA + meta tags), planificar migración a Next.js
+para el Q3 2026 si el negocio crece según lo esperado.
+
+
+────────────────────────────────────────────────────────────────────────────────
+7. SISTEMA DE PUBLICIDAD (BANNERS)
+────────────────────────────────────────────────────────────────────────────────
+
+OBJETIVO: Poder ofrecerle a un cliente (inmobiliaria, banco, empresa)
+un espacio publicitario con métricas reales (impresiones, clics, CTR).
+
+────────────────────────────
+7.1 CAMBIOS EN BASE DE DATOS
+────────────────────────────
+
+Tabla banners — extender con:
+  anunciante TEXT NOT NULL              → nombre del cliente
+  fecha_inicio DATE                     → cuándo empieza la campaña
+  fecha_fin DATE                        → cuándo termina
+  impresiones INTEGER DEFAULT 0         → contador de vistas
+  clics INTEGER DEFAULT 0              → contador de clics
+  costo_total NUMERIC                  → cuánto pagó (para reportes internos)
+  tipo TEXT DEFAULT 'horizontal'       → 'horizontal' | 'lateral' | 'popup'
+  ciudad_id INTEGER REFERENCES ciudades → si el banner es para una ciudad específica
+
+────────────────────────────
+7.2 TRACKING DE IMPRESIONES Y CLICS
+────────────────────────────
+
+IMPRESIONES:
+  - Usar Intersection Observer en el componente AdBanner.
+  - Cuando el banner entra al viewport del usuario, llamar:
+    POST /api/banners/:id/impression
+  - El servidor incrementa el contador: UPDATE banners SET impresiones = impresiones + 1
+
+CLICS:
+  - Al hacer click en cualquier banner: POST /api/banners/:id/click
+  - El servidor incrementa clics y devuelve la URL de destino.
+  - El frontend redirige al usuario.
+
+CTR (Click Through Rate):
+  CTR = (clics / impresiones) * 100
+  Calcularlo en el reporte, no guardarlo (deriva de los dos anteriores).
+
+────────────────────────────
+7.3 PANEL DE BANNERS EN ADMIN
+────────────────────────────
+
+El AdminDashboard actual no tiene UI para banners.
+Crear tab "Publicidad" en el panel de admin con:
+  - Tabla de banners activos con métricas en tiempo real.
+  - Crear / editar / pausar banner.
+  - Reportes: impresiones por día, clics por día, CTR promedio.
+  - Exportar CSV para enviar al cliente.
+
+────────────────────────────
+7.4 TIPOS DE ESPACIOS PUBLICITARIOS
+────────────────────────────
+
+Definir y documentar los espacios disponibles:
+  - Banner horizontal superior (AdBanner actual): 728x90 o full-width
+  - Banner lateral (sidebar del listado): 300x250
+  - Banner en detalle de propiedad: 300x600 o nativo
+  - Banner entre resultados (cada N propiedades): nativo en el grid
+
+Cada tipo tiene precio diferente. Definir pricing antes del lanzamiento comercial.
+
+
+────────────────────────────────────────────────────────────────────────────────
+8. SEGURIDAD — LO QUE FALTA IMPLEMENTAR
+────────────────────────────────────────────────────────────────────────────────
+
+  a) Rate limiting:
+     express-rate-limit en endpoints de auth (/register, /login).
+     Sin esto, alguien puede intentar passwords infinitamente.
+     Configuración básica: 10 intentos por IP por 15 minutos.
+
+  b) Validación de inputs:
+     Actualmente mínima. Usar zod o joi para validar todos los payloads
+     de entrada antes de tocar la base de datos.
+     Prioridad alta: formularios de registro y publicación de propiedades.
+
+  c) Helmet.js:
+     Middleware que agrega headers HTTP de seguridad automáticamente
+     (CSP, X-Frame-Options, etc.). Se instala en 5 minutos.
+
+  d) Variables de entorno:
+     JWT_SECRET debe ser un string largo y aleatorio en producción
+     (no "dev-secret" como está ahora).
+     Generar con: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+
+  e) HTTPS:
+     Manejado por Vercel (frontend) y Railway (backend). No requiere
+     configuración manual.
+
+  f) Subida de archivos:
+     Al implementar Cloudinary, validar tipo de archivo y tamaño máximo
+     en el frontend antes de subir. No aceptar SVG ni ejecutables.
+
+  g) SQL Injection:
+     El código actual usa prepared statements correctamente. Mantener
+     esta práctica con PostgreSQL usando parámetros ($1, $2, etc.).
+
+  h) Tokens JWT en localStorage:
+     Considerado aceptable para SPAs sin SSR. Si en el futuro se migra
+     a Next.js, evaluar cookies httpOnly como alternativa más segura.
+
+
+────────────────────────────────────────────────────────────────────────────────
+9. EMAILS TRANSACCIONALES
+────────────────────────────────────────────────────────────────────────────────
+
+HERRAMIENTA RECOMENDADA: Resend (resend.com)
+  - 3.000 emails/mes gratis.
+  - API REST simple desde Node.js.
+  - Permite templates HTML.
+  - Variables de entorno: RESEND_API_KEY.
+
+EMAILS MÍNIMOS A IMPLEMENTAR:
+  1. Bienvenida al registrarse (usuario e inmobiliaria)
+  2. Recupero de contraseña (con link de token de un solo uso, expira en 1h)
+     Requiere tabla password_reset_tokens (token, user_id, expires_at, used)
+  3. Notificación de nueva propiedad que coincide con alerta del usuario
+     (futura, cuando se implemente el sistema de alertas)
+
+NOTA: Sin recupero de contraseña no se puede lanzar. Es bloqueante.
+
+
+────────────────────────────────────────────────────────────────────────────────
+10. PAGINACIÓN
+────────────────────────────────────────────────────────────────────────────────
+
+PROBLEMA: GET /api/properties devuelve todas las propiedades sin límite.
+Con datos reales de varias ciudades esto puede ser cientos de registros.
+
+SOLUCIÓN:
+  Query params: ?page=1&limit=24
+  Respuesta: { properties: [...], total: 150, page: 1, totalPages: 7 }
+
+  Frontend: componente de paginación o "cargar más" (infinite scroll).
+  Recomendación UX: botones de página para SEO (Google puede seguirlos),
+  no infinite scroll (Google no lo maneja bien).
+
+CURSOR-BASED PAGINATION (alternativa avanzada):
+  Para listas que se actualizan frecuentemente, paginación por cursor
+  es más estable que por offset. Evaluar más adelante.
+
+
+────────────────────────────────────────────────────────────────────────────────
+11. ESCALABILIDAD — CONSIDERACIONES A LARGO PLAZO
+────────────────────────────────────────────────────────────────────────────────
+
+CUÁNDO ESCALAR CADA COMPONENTE:
+
+  Base de datos:
+    - Railway Postgres alcanza para cientos de miles de propiedades.
+    - Si se llega a millones de registros: connection pooling con PgBouncer,
+      índices en columnas de búsqueda frecuente (barrio, tipo, precio, ciudad).
+    - Read replicas si las lecturas saturan el servidor.
+
+  Backend:
+    - Express en Railway escala verticalmente (más RAM/CPU).
+    - Si se necesita escala horizontal: containers Docker, evaluar si
+      el servidor sigue siendo stateless (actualmente sí, porque JWT no
+      requiere sesión en servidor).
+
+  Imágenes:
+    - Cloudinary CDN ya está distribuida globalmente. No hay nada que escalar.
+
+  Frontend:
+    - Vercel CDN ya está distribuida. No hay nada que escalar.
+
+  Caché:
+    - Agregar Redis para cachear respuestas de endpoints frecuentes
+      (listados por ciudad, stats del portal) cuando el tráfico lo justifique.
+    - No antes: es complejidad innecesaria al principio.
+
+ÍNDICES DE BASE DE DATOS A CREAR DESDE EL INICIO:
+  CREATE INDEX idx_properties_ciudad ON properties(ciudad_id);
+  CREATE INDEX idx_properties_tipo ON properties(tipo);
+  CREATE INDEX idx_properties_barrio ON properties(barrio);
+  CREATE INDEX idx_properties_precio ON properties(precio);
+  CREATE INDEX idx_properties_created_at ON properties(created_at DESC);
+  Estos índices hacen las búsquedas filtradas mucho más rápidas.
+
+MONITORING EN PRODUCCIÓN:
+  - Logs: Railway incluye logs. Para búsqueda y alertas, considerar Logtail o Papertrail.
+  - Uptime: UptimeRobot (gratuito) envía alerta si el servidor cae.
+  - Errores en frontend: Sentry (tiene tier gratuito) captura excepciones
+    de JavaScript en producción con stack traces.
+
+
+────────────────────────────────────────────────────────────────────────────────
+12. CONSIDERACIONES PARA CRECIMIENTO DEL EQUIPO
+────────────────────────────────────────────────────────────────────────────────
+
+DOCUMENTACIÓN:
+  - Este archivo es el punto de partida.
+  - Complementar con README.md en la raíz del repo con instrucciones de setup.
+  - Documentar variables de entorno en un .env.example (sin valores reales).
+  - Documentar los endpoints de la API (considerar Swagger/OpenAPI cuando
+    el equipo crezca).
+
+ONBOARDING DE NUEVO DESARROLLADOR:
+  Para que un nuevo dev pueda correr el proyecto local en <30 minutos:
+  1. git clone
+  2. Copiar .env.example a .env y completar valores
+  3. npm install (en /client y /server)
+  4. npm run dev (en ambos)
+  El README debe cubrir exactamente estos pasos.
+
+CODE REVIEW:
+  Aunque seas solo, mantener la disciplina de PRs (no push directo a develop).
+  Cuando llegue alguien más al equipo, el proceso ya estará establecido.
+
+LINTER Y FORMATTER:
+  Agregar ESLint + Prettier al proyecto. Que el CI falle si hay errores de lint.
+  Esto evita discusiones de estilo en code reviews cuando hay más gente.
+  Configurar Husky para que el lint corra antes de cada commit (pre-commit hook).
+
+TESTS:
+  No hay tests actualmente. Para un equipo pequeño:
+  - Tests de integración en el backend (supertest + vitest) para los
+    endpoints críticos: auth, CRUD de propiedades, permisos.
+  - Tests E2E (Playwright) para los flujos principales: buscar propiedad,
+    contactar, publicar, login.
+  No es urgente para el MVP, pero sí antes de sumar otro desarrollador.
+
+VARIABLES DE ENTORNO Y SECRETOS:
+  - Nunca commitear credenciales reales.
+  - Usar GitHub Secrets o el gestor de secretos de Railway para producción.
+  - Cada entorno (dev, staging, prod) tiene sus propias variables.
+
+
+────────────────────────────────────────────────────────────────────────────────
+13. ROADMAP PRIORIZADO
+────────────────────────────────────────────────────────────────────────────────
+
+FASE 0 — FUNDACIONES (antes de lanzar, ~3-4 semanas)
+  [x] Configurar ramas git: main, staging, develop
+  [ ] Agregar .env.example al repo
+  [ ] Migrar a PostgreSQL (Railway) + Drizzle ORM
+  [ ] Agregar modelo multi-ciudad al schema
+  [ ] Agregar paginación a GET /api/properties
+  [ ] Rate limiting en endpoints de auth
+  [ ] Recupero de contraseña con email (Resend)
+  [ ] Deploy: Vercel (frontend) + Railway (backend + Postgres)
+  [ ] Configurar entornos staging y producción
+
+FASE 1 — LANZAMIENTO (~2 semanas después de Fase 0)
+  [ ] Implementar subida de imágenes con Cloudinary
+  [ ] Meta tags dinámicas por página (react-helmet-async)
+  [ ] Sitemap XML y robots.txt
+  [ ] Configurar Google Analytics 4 via GTM
+  [ ] Configurar Meta Pixel via GTM
+  [ ] Configurar Google Search Console
+  [ ] Panel de banners en AdminDashboard con CRUD
+  [ ] Tracking de impresiones y clics en banners
+  [ ] Helmet.js (headers de seguridad)
+
+FASE 2 — CRECIMIENTO (~1 mes después del lanzamiento)
+  [ ] Multi-ciudad en el frontend (selector de ciudad, URLs por ciudad)
+  [ ] URLs amigables para SEO (/ciudad/tipo/titulo-id)
+  [ ] Sistema de alertas por email/WhatsApp
+  [ ] Datos estructurados Schema.org en PropertyDetail
+  [ ] Reportes de banners exportables a CSV
+  [ ] Sentry para monitoreo de errores en producción
+  [ ] UptimeRobot para monitoreo de uptime
+
+FASE 3 — ESCALADO
+  [ ] Evaluar migración a Next.js (SSR) según performance de SEO
+  [ ] Redis para caché de endpoints de alto tráfico
+  [ ] Meta Conversions API (server-side events)
+  [ ] Tests automatizados (supertest + Playwright)
+  [ ] CI/CD con GitHub Actions
+  [ ] Múltiples fotos por propiedad
+  [ ] Panel de analytics para inmobiliarias (cuántas vistas tuvo cada propiedad)
+
+
+────────────────────────────────────────────────────────────────────────────────
+14. CUENTAS Y SERVICIOS A CREAR
+────────────────────────────────────────────────────────────────────────────────
+
+Antes del lanzamiento, crear y configurar:
+
+  [ ] Railway (railway.app)             → backend Node.js + Postgres
+  [ ] Vercel (vercel.com)               → frontend React
+  [ ] Cloudinary (cloudinary.com)       → storage de imágenes
+  [ ] Resend (resend.com)               → emails transaccionales
+  [ ] Google Analytics (analytics.google.com)  → GA4
+  [ ] Google Tag Manager (tagmanager.google.com)
+  [ ] Google Search Console (search.google.com/search-console)
+  [ ] Meta Business Manager (business.facebook.com)  → Meta Pixel
+  [ ] UptimeRobot (uptimerobot.com)     → monitoreo de uptime (gratis)
+  [ ] Sentry (sentry.io)               → errores en producción (tier gratis)
+  [ ] Dominio: registrar rentar.com.ar u otro en NIC Argentina o similar
+
+NOTAS:
+  - Todas las cuentas deben estar bajo el email/cuenta del proyecto,
+    no bajo la cuenta personal del desarrollador.
+  - Guardar credenciales en un gestor de passwords del equipo
+    (Bitwarden, 1Password, etc.).
+
+
+────────────────────────────────────────────────────────────────────────────────
+15. NOTAS Y DECISIONES PENDIENTES
+────────────────────────────────────────────────────────────────────────────────
+
+  - Decidir: ¿Se migra a Next.js desde el inicio o se evalúa después?
+    Impacto alto en el tiempo de desarrollo inicial.
+
+  - Decidir: ¿Cuántas fotos por propiedad? (afecta el schema de BD).
+
+  - Decidir: ¿Precios de espacios publicitarios?
+    (necesario para salir a vender antes de tener analytics reales).
+
+  - Decidir: ¿Registro abierto para inmobiliarias o solo por invitación/aprobación?
+    Actualmente es abierto. Con aprobación, el admin confirma a cada inmobiliaria
+    antes de que pueda publicar. Previene spam.
+
+  - Pendiente: El dólar blue en /api/stats/summary está hardcodeado.
+    Integrar con una API pública (bluelytics.com.ar, por ejemplo).
+
+  - Pendiente: El clima en /api/stats/summary está hardcodeado.
+    Integrar con OpenWeatherMap API (tiene free tier).
+
+  - A definir: ¿Las alertas de propiedades son por WhatsApp (Twilio) o por email?
+    El botón existe en la UI pero no tiene lógica.
+
+================================================================================
+  FIN DEL DOCUMENTO
+  Última actualización: 12 Mayo 2026
+  Próxima revisión sugerida: al completar Fase 0
+================================================================================
