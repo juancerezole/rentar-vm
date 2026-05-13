@@ -11,18 +11,21 @@ import AISearchBar from '../components/AISearchBar.jsx';
 import HeatMap from '../components/HeatMap.jsx';
 import Calculadora from '../components/Calculadora.jsx';
 import SectionTabs from '../components/SectionTabs.jsx';
+import Pagination from '../components/Pagination.jsx';
 
 const EMPTY = {
   q: '', tipo: '', ambientes: '', barrio: '', garantia: '',
   minPrecio: '', maxPrecio: '', mascotas: '', amoblado: '', expensas: '',
 };
+const LIMIT = 24;
 
 export default function Home() {
-  const [tab, setTab] = useState('alquileres');
+  const [tab, setTab]       = useState('alquileres');
   const [filters, setFilters] = useState(EMPTY);
-  const [props, setProps] = useState([]);
+  const [page, setPage]     = useState(1);
+  const [result, setResult] = useState({ properties: [], total: 0, totalPages: 1 });
   const [barrios, setBarrios] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats]   = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -30,27 +33,42 @@ export default function Home() {
     api.get('/stats/summary').then(r => setStats(r.data));
   }, []);
 
+  // Cambia filtros y vuelve a página 1
+  const changeFilters = (updater) => {
+    setFilters(updater);
+    setPage(1);
+  };
+
   const params = useMemo(() => {
-    const o = {};
+    const o = { page, limit: LIMIT };
     Object.entries(filters).forEach(([k, v]) => { if (v) o[k] = v; });
     return o;
-  }, [filters]);
+  }, [filters, page]);
 
   useEffect(() => {
     setLoading(true);
     const t = setTimeout(() => {
       api.get('/properties', { params })
-        .then(r => setProps(r.data.properties))
+        .then(r => setResult({
+          properties: r.data.properties,
+          total:      r.data.total,
+          totalPages: r.data.totalPages,
+        }))
         .finally(() => setLoading(false));
     }, 200);
     return () => clearTimeout(t);
   }, [params]);
 
+  const changePage = (newPage) => {
+    setPage(newPage);
+    document.getElementById('resultados')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const tabs = [
-    { id: 'alquileres',    label: 'Alquileres',    icon: Building,  badge: stats?.propiedades },
-    { id: 'oportunidades', label: 'Oportunidades', icon: Flame,     badge: stats?.liquidacion },
+    { id: 'alquileres',    label: 'Alquileres',      icon: Building,  badge: stats?.propiedades },
+    { id: 'oportunidades', label: 'Oportunidades',   icon: Flame,     badge: stats?.liquidacion },
     { id: 'mapa',          label: 'Mapa por barrio', icon: MapPinned },
-    { id: 'herramientas',  label: 'Herramientas',  icon: Calculator },
+    { id: 'herramientas',  label: 'Herramientas',    icon: Calculator },
   ];
 
   return (
@@ -83,9 +101,14 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         {tab === 'alquileres' && (
           <AlquileresTab
-            filters={filters} setFilters={setFilters} barrios={barrios}
-            props={props} loading={loading}
-            onMapBarrio={(b) => setFilters(f => ({ ...f, barrio: b }))}
+            filters={filters}
+            setFilters={changeFilters}
+            barrios={barrios}
+            result={result}
+            page={page}
+            loading={loading}
+            onChangePage={changePage}
+            onMapBarrio={(b) => changeFilters(f => ({ ...f, barrio: b }))}
           />
         )}
         {tab === 'oportunidades' && <Oportunidades />}
@@ -93,7 +116,7 @@ export default function Home() {
           <MapaTab
             barrios={barrios}
             selected={filters.barrio}
-            onSelect={(b) => { setFilters(f => ({ ...f, barrio: b })); setTab('alquileres'); }}
+            onSelect={(b) => { changeFilters(f => ({ ...f, barrio: b })); setTab('alquileres'); }}
           />
         )}
         {tab === 'herramientas' && <HerramientasTab />}
@@ -102,7 +125,9 @@ export default function Home() {
   );
 }
 
-function AlquileresTab({ filters, setFilters, barrios, props, loading, onMapBarrio }) {
+function AlquileresTab({ filters, setFilters, barrios, result, page, loading, onChangePage, onMapBarrio }) {
+  const { properties, total, totalPages } = result;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6">
       <aside className="space-y-5 lg:sticky lg:top-32 lg:self-start">
@@ -110,30 +135,36 @@ function AlquileresTab({ filters, setFilters, barrios, props, loading, onMapBarr
           filters={filters}
           setFilters={setFilters}
           barrios={barrios}
-          onClear={() => setFilters({ q: '', tipo: '', ambientes: '', barrio: '', garantia: '', minPrecio: '', maxPrecio: '', mascotas: '', amoblado: '', expensas: '' })}
+          onClear={() => setFilters(EMPTY)}
         />
       </aside>
 
-      <section className="space-y-5">
+      <section id="resultados" className="space-y-5 scroll-mt-24">
         <div className="bg-white dark:bg-night-card border border-ink-200 dark:border-night-border rounded-xl px-4 h-11 flex items-center justify-between shadow-soft">
           <div className="text-sm text-ink-500 dark:text-night-muted">
-            <strong className="text-ink-900 dark:text-night-text font-semibold">{props.length} propiedades</strong>
+            <strong className="text-ink-900 dark:text-night-text font-semibold">{total} propiedades</strong>
             {filters.barrio && (
               <span> en <span className="font-semibold text-brand dark:text-accent-orange">{filters.barrio}</span></span>
+            )}
+            {totalPages > 1 && (
+              <span className="text-ink-400 dark:text-night-dim"> · pág. {page} de {totalPages}</span>
             )}
           </div>
           {loading && <span className="text-xs text-ink-400 dark:text-night-dim animate-pulse">Buscando...</span>}
         </div>
 
-        {props.length === 0 && !loading ? (
+        {properties.length === 0 && !loading ? (
           <div className="bg-white dark:bg-night-card border border-dashed border-ink-200 dark:border-night-border rounded-2xl p-14 text-center">
             <p className="text-ink-500 dark:text-night-muted font-medium">Sin resultados para los filtros aplicados</p>
             <p className="text-xs text-ink-400 dark:text-night-dim mt-1">Probá cambiando el barrio, tipo o rango de precio.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 animate-fadeIn">
-            {props.map(p => <PropertyCard key={p.id} property={p} />)}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 animate-fadeIn">
+              {properties.map(p => <PropertyCard key={p.id} property={p} />)}
+            </div>
+            <Pagination page={page} totalPages={totalPages} onChange={onChangePage} />
+          </>
         )}
       </section>
     </div>
