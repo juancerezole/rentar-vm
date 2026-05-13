@@ -795,7 +795,7 @@ VARIABLES DE ENTORNO Y SECRETOS:
 
 FASE 0 — FUNDACIONES (antes de lanzar, ~3-4 semanas)
   [x] Configurar ramas git: main, staging, develop
-  [ ] Agregar .env.example al repo
+  [x] Agregar .env.example al repo
   [ ] Migrar a PostgreSQL (Railway) + Drizzle ORM
   [ ] Agregar modelo multi-ciudad al schema
   [ ] Agregar paginación a GET /api/properties
