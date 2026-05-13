@@ -25,12 +25,16 @@ const propWithUser = () => ({
   contacto_email: users.email,
 });
 
-// ── GET / — listado con hasta 10 filtros simultáneos (Drizzle ORM) ────────────
+// ── GET / — listado con filtros + paginación (Drizzle ORM) ──────────────────
 router.get('/', wrap(async (req, res) => {
   const {
     tipo, barrio, minPrecio, maxPrecio, ambientes, garantia,
     mascotas, amoblado, expensas, q, destacado, liquidacion,
   } = req.query;
+
+  const page  = Math.max(1, Number(req.query.page)  || 1);
+  const limit = Math.min(48, Math.max(1, Number(req.query.limit) || 24));
+  const offset = (page - 1) * limit;
 
   const conds = [];
   if (tipo)                     conds.push(eq(propsTable.tipo, tipo));
@@ -43,27 +47,38 @@ router.get('/', wrap(async (req, res) => {
       : conds.push(eq(propsTable.ambientes, Number(ambientes)));
   }
   if (garantia && garantia !== 'todas') conds.push(eq(propsTable.garantia, garantia));
-  if (mascotas   === 'true') conds.push(eq(propsTable.mascotas,          true));
-  if (amoblado   === 'true') conds.push(eq(propsTable.amoblado,          true));
+  if (mascotas   === 'true') conds.push(eq(propsTable.mascotas,           true));
+  if (amoblado   === 'true') conds.push(eq(propsTable.amoblado,           true));
   if (expensas   === 'true') conds.push(eq(propsTable.expensas_incluidas, true));
   if (destacado  === 'true') conds.push(eq(propsTable.destacado,          true));
   if (liquidacion === 'true') conds.push(eq(propsTable.liquidacion,       true));
   if (q) {
     conds.push(or(
-      ilike(propsTable.titulo,     `%${q}%`),
-      ilike(propsTable.direccion,  `%${q}%`),
-      ilike(propsTable.descripcion,`%${q}%`),
+      ilike(propsTable.titulo,      `%${q}%`),
+      ilike(propsTable.direccion,   `%${q}%`),
+      ilike(propsTable.descripcion, `%${q}%`),
     ));
   }
 
-  const rows = await db
-    .select(propWithUser())
-    .from(propsTable)
-    .innerJoin(users, eq(users.id, propsTable.user_id))
-    .where(conds.length ? and(...conds) : undefined)
-    .orderBy(desc(propsTable.destacado), desc(propsTable.created_at));
+  const whereExpr = conds.length ? and(...conds) : undefined;
 
-  res.json({ properties: rows, total: rows.length });
+  // Count y datos en paralelo sobre el mismo filtro
+  const [countResult, rows] = await Promise.all([
+    db.select({ count: sql`count(*)::int` })
+      .from(propsTable)
+      .innerJoin(users, eq(users.id, propsTable.user_id))
+      .where(whereExpr),
+    db.select(propWithUser())
+      .from(propsTable)
+      .innerJoin(users, eq(users.id, propsTable.user_id))
+      .where(whereExpr)
+      .orderBy(desc(propsTable.destacado), desc(propsTable.created_at))
+      .limit(limit)
+      .offset(offset),
+  ]);
+
+  const total = countResult[0].count;
+  res.json({ properties: rows, total, page, totalPages: Math.ceil(total / limit) });
 }));
 
 // ── POST /ai-search — búsqueda en lenguaje natural (Raw SQL + pg pool) ────────
