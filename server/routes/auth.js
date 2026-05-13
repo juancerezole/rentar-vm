@@ -1,41 +1,59 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { db } from '../db.js';
+import { eq } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { users } from '../db/schema.js';
 import { authRequired, signToken } from '../middleware/auth.js';
 
 const router = Router();
+const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
 
-router.post('/register', (req, res) => {
+const PUBLIC_FIELDS = {
+  id:       users.id,
+  nombre:   users.nombre,
+  email:    users.email,
+  rol:      users.rol,
+  empresa:  users.empresa,
+  telefono: users.telefono,
+};
+
+router.post('/register', wrap(async (req, res) => {
   const { nombre, email, password, rol = 'usuario', empresa, telefono } = req.body || {};
   if (!nombre || !email || !password) return res.status(400).json({ error: 'faltan campos' });
   if (!['usuario', 'inmobiliaria'].includes(rol)) return res.status(400).json({ error: 'rol invalido' });
-  const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+
+  const [exists] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
   if (exists) return res.status(409).json({ error: 'email ya registrado' });
 
-  const hash = bcrypt.hashSync(password, 10);
-  const info = db.prepare(
-    'INSERT INTO users (nombre, email, password_hash, rol, empresa, telefono) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(nombre, email, hash, rol, empresa || null, telefono || null);
+  const [user] = await db.insert(users).values({
+    nombre,
+    email,
+    password_hash: bcrypt.hashSync(password, 10),
+    rol,
+    empresa:  empresa  || null,
+    telefono: telefono || null,
+  }).returning(PUBLIC_FIELDS);
 
-  const user = db.prepare('SELECT id, nombre, email, rol, empresa, telefono FROM users WHERE id = ?').get(Number(info.lastInsertRowid));
   res.json({ token: signToken(user), user });
-});
+}));
 
-router.post('/login', (req, res) => {
+router.post('/login', wrap(async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'faltan campos' });
-  const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+
+  const [row] = await db.select().from(users).where(eq(users.email, email));
   if (!row || !bcrypt.compareSync(password, row.password_hash)) {
     return res.status(401).json({ error: 'credenciales invalidas' });
   }
+
   const user = { id: row.id, nombre: row.nombre, email: row.email, rol: row.rol, empresa: row.empresa, telefono: row.telefono };
   res.json({ token: signToken(user), user });
-});
+}));
 
-router.get('/me', authRequired, (req, res) => {
-  const user = db.prepare('SELECT id, nombre, email, rol, empresa, telefono FROM users WHERE id = ?').get(req.user.id);
+router.get('/me', authRequired, wrap(async (req, res) => {
+  const [user] = await db.select(PUBLIC_FIELDS).from(users).where(eq(users.id, req.user.id));
   if (!user) return res.status(404).json({ error: 'usuario no encontrado' });
   res.json({ user });
-});
+}));
 
 export default router;
