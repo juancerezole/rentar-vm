@@ -801,8 +801,8 @@ FASE 0 — FUNDACIONES (antes de lanzar, ~3-4 semanas)
   [x] Agregar paginación a GET /api/properties
   [x] Rate limiting en endpoints de auth
   [x] Recupero de contraseña con email (Resend)
-  [ ] Deploy: Vercel (frontend) + Railway (backend + Postgres)
-  [ ] Configurar entornos staging y producción
+  [x] Deploy: Vercel (frontend) + Railway (backend + Postgres)
+  [x] Configurar entornos staging y producción
 
 FASE 1 — LANZAMIENTO (~2 semanas después de Fase 0)
   [ ] Implementar subida de imágenes con Cloudinary
