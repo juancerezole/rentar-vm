@@ -7,6 +7,8 @@ import Register from './pages/Register.jsx';
 import InmobiliariaDashboard from './pages/InmobiliariaDashboard.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import PropertyDetail from './pages/PropertyDetail.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -24,6 +26,8 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/propiedad/:id" element={<PropertyDetail />} />
         <Route path="/panel-inmobiliaria" element={
           <Protected roles={['inmobiliaria', 'admin']}><InmobiliariaDashboard /></Protected>
