@@ -72,6 +72,15 @@ export const banners = pgTable('banners', {
   activo:    boolean('activo').notNull().default(true),
 });
 
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id:         serial('id').primaryKey(),
+  user_id:    integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token:      text('token').notNull().unique(),
+  expires_at: timestamp('expires_at').notNull(),
+  used:       boolean('used').notNull().default(false),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
 export const profesionales = pgTable('profesionales', {
   id:        serial('id').primaryKey(),
   nombre:    text('nombre').notNull(),
