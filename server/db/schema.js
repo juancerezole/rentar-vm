@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, serial, text, integer, boolean, timestamp, real } from 'drizzle-orm/pg-core';
+import { pgTable, pgEnum, serial, text, integer, boolean, timestamp, real, index } from 'drizzle-orm/pg-core';
 
 export const rolEnum   = pgEnum('rol',     ['admin', 'inmobiliaria', 'usuario']);
 export const garantiaEnum = pgEnum('garantia', ['requerida', 'sin', 'ambas']);
@@ -54,7 +54,14 @@ export const properties = pgTable('properties', {
   descripcion:       text('descripcion'),
   imagen:            text('imagen'),
   created_at:        timestamp('created_at').defaultNow(),
-});
+}, (t) => [
+  index('idx_properties_ciudad_id').on(t.ciudad_id),
+  index('idx_properties_tipo').on(t.tipo),
+  index('idx_properties_barrio').on(t.barrio),
+  index('idx_properties_precio').on(t.precio),
+  index('idx_properties_created_at').on(t.created_at),
+  index('idx_properties_user_id').on(t.user_id),
+]);
 
 export const banners = pgTable('banners', {
   id:        serial('id').primaryKey(),

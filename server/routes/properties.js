@@ -7,12 +7,18 @@ import { authRequired, requireRole } from '../middleware/auth.js';
 const router = Router();
 const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
 
+function parseId(param) {
+  const n = Number(param);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
 // Ciudad por defecto (Villa María). Se resuelve una sola vez en la primera llamada.
 let _defaultCiudadId = null;
 async function getDefaultCiudadId() {
   if (_defaultCiudadId) return _defaultCiudadId;
   const [c] = await db.select({ id: ciudades.id }).from(ciudades).where(eq(ciudades.slug, 'villa-maria'));
-  _defaultCiudadId = c?.id ?? 1;
+  if (!c) throw new Error('Ciudad "villa-maria" no encontrada. ¿Corriste el seed?');
+  _defaultCiudadId = c.id;
   return _defaultCiudadId;
 }
 
@@ -190,11 +196,13 @@ router.get('/mine/list', authRequired, wrap(async (req, res) => {
 
 // ── GET /:id (Drizzle ORM) ────────────────────────────────────────────────────
 router.get('/:id', wrap(async (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'id inválido' });
   const [row] = await db
     .select(propWithUser())
     .from(propsTable)
     .innerJoin(users, eq(users.id, propsTable.user_id))
-    .where(eq(propsTable.id, Number(req.params.id)));
+    .where(eq(propsTable.id, id));
   if (!row) return res.status(404).json({ error: 'no encontrada' });
   res.json({ property: row });
 }));
@@ -234,10 +242,12 @@ router.post('/', authRequired, requireRole('inmobiliaria', 'admin'), wrap(async 
 
 // ── PUT /:id — editar propiedad (Drizzle ORM) ─────────────────────────────────
 router.put('/:id', authRequired, wrap(async (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'id inválido' });
   const [existing] = await db
     .select()
     .from(propsTable)
-    .where(eq(propsTable.id, Number(req.params.id)));
+    .where(eq(propsTable.id, id));
   if (!existing) return res.status(404).json({ error: 'no encontrada' });
   if (existing.user_id !== req.user.id && req.user.rol !== 'admin') {
     return res.status(403).json({ error: 'sin permisos' });
@@ -267,7 +277,7 @@ router.put('/:id', authRequired, wrap(async (req, res) => {
   const [row] = await db
     .update(propsTable)
     .set(merged)
-    .where(eq(propsTable.id, Number(req.params.id)))
+    .where(eq(propsTable.id, id))
     .returning();
 
   res.json({ property: row });
@@ -275,15 +285,17 @@ router.put('/:id', authRequired, wrap(async (req, res) => {
 
 // ── DELETE /:id (Drizzle ORM) ─────────────────────────────────────────────────
 router.delete('/:id', authRequired, wrap(async (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'id inválido' });
   const [existing] = await db
     .select({ id: propsTable.id, user_id: propsTable.user_id })
     .from(propsTable)
-    .where(eq(propsTable.id, Number(req.params.id)));
+    .where(eq(propsTable.id, id));
   if (!existing) return res.status(404).json({ error: 'no encontrada' });
   if (existing.user_id !== req.user.id && req.user.rol !== 'admin') {
     return res.status(403).json({ error: 'sin permisos' });
   }
-  await db.delete(propsTable).where(eq(propsTable.id, Number(req.params.id)));
+  await db.delete(propsTable).where(eq(propsTable.id, id));
   res.json({ ok: true });
 }));
 
