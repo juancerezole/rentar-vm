@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from './index.js';
 import { ciudades, users, barrios, properties, banners, profesionales } from './schema.js';
 
@@ -158,7 +158,7 @@ export async function initDb() {
     if (!inmoIds) {
       // La tabla de usuarios ya existía: buscamos los IDs por email
       const findId = async (email) => {
-        const [u] = await db.select({ id: users.id }).from(users).where(sql`email = ${email}`);
+        const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
         return u?.id;
       };
       inmoIds = {

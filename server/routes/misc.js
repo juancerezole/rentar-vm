@@ -80,11 +80,13 @@ router.get('/profesionales', wrap(async (_req, res) => {
 }));
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
-// Drizzle ORM: tres counts simples
+// Drizzle ORM: tres counts en paralelo
 router.get('/stats/summary', wrap(async (_req, res) => {
-  const [{ total }]     = await db.select({ total:     sql`count(*)::int` }).from(properties);
-  const [{ liquidaciones }] = await db.select({ liquidaciones: sql`count(*)::int` }).from(properties).where(eq(properties.liquidacion, true));
-  const [{ inmobiliarias }] = await db.select({ inmobiliarias: sql`count(*)::int` }).from(users).where(eq(users.rol, 'inmobiliaria'));
+  const [[{ total }], [{ liquidaciones }], [{ inmobiliarias }]] = await Promise.all([
+    db.select({ total:        sql`count(*)::int` }).from(properties),
+    db.select({ liquidaciones: sql`count(*)::int` }).from(properties).where(eq(properties.liquidacion, true)),
+    db.select({ inmobiliarias: sql`count(*)::int` }).from(users).where(eq(users.rol, 'inmobiliaria')),
+  ]);
 
   res.json({
     propiedades:  total,
