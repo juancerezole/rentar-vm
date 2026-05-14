@@ -800,7 +800,7 @@ FASE 0 — FUNDACIONES (antes de lanzar, ~3-4 semanas)
   [x] Agregar modelo multi-ciudad al schema
   [x] Agregar paginación a GET /api/properties
   [x] Rate limiting en endpoints de auth
-  [ ] Recupero de contraseña con email (Resend)
+  [x] Recupero de contraseña con email (Resend)
   [ ] Deploy: Vercel (frontend) + Railway (backend + Postgres)
   [ ] Configurar entornos staging y producción
 
