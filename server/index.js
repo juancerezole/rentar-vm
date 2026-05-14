@@ -1,10 +1,16 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import authRoutes from './routes/auth.js';
 import propertiesRoutes from './routes/properties.js';
 import miscRoutes from './routes/misc.js';
+import { db } from './db/index.js';
 import { initDb } from './db/seed.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app    = express();
 const PORT   = process.env.PORT   || 4000;
@@ -26,9 +32,15 @@ app.use((err, _req, res, _next) => {
 });
 
 async function main() {
+  // Aplica migraciones pendientes antes de arrancar (idempotente)
+  console.log('[db] aplicando migraciones...');
+  await migrate(db, { migrationsFolder: path.join(__dirname, 'db/migrations') });
+  console.log('[db] migraciones OK');
+
   await initDb();
+
   app.listen(PORT, () =>
-    console.log(`[server] Rentar ${isProd ? '(prod)' : 'API'} escuchando en :${PORT}`)
+    console.log(`[server] Rentar API escuchando en :${PORT}`)
   );
 }
 
