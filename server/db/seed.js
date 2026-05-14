@@ -137,6 +137,8 @@ async function seedProfesionales() {
 export async function initDb() {
   console.log('[db] verificando estado inicial...');
 
+  // ── Datos base: siempre corren en todos los entornos ─────────────────────
+  // Ciudad y barrios son configuración real del sistema, no datos de prueba.
   let ciudadId;
   if (await tableEmpty(ciudades)) {
     ciudadId = await seedCiudades();
@@ -144,35 +146,36 @@ export async function initDb() {
     const [c] = await db.select({ id: ciudades.id }).from(ciudades).limit(1);
     ciudadId = c.id;
   }
+  if (await tableEmpty(barrios)) await seedBarrios(ciudadId);
 
-  let inmoIds = null;
-  if (await tableEmpty(users)) {
-    inmoIds = await seedUsers();
-  }
-
-  if (await tableEmpty(barrios)) {
-    await seedBarrios(ciudadId);
-  }
-
-  if (await tableEmpty(properties)) {
-    if (!inmoIds) {
-      // La tabla de usuarios ya existía: buscamos los IDs por email
-      const findId = async (email) => {
-        const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
-        return u?.id;
-      };
-      inmoIds = {
-        inmoId:  await findId('inmo@rentar.com.ar'),
-        inmo2Id: await findId('sur@rentar.com.ar'),
-        inmo3Id: await findId('velez@rentar.com.ar'),
-        inmo4Id: await findId('bustos@rentar.com.ar'),
-      };
+  // ── Datos de prueba: solo con SEED_DATA=true (QA / desarrollo local) ─────
+  if (process.env.SEED_DATA === 'true') {
+    let inmoIds = null;
+    if (await tableEmpty(users)) {
+      inmoIds = await seedUsers();
     }
-    await seedProperties(ciudadId, inmoIds);
-  }
 
-  if (await tableEmpty(banners))       await seedBanners();
-  if (await tableEmpty(profesionales)) await seedProfesionales();
+    if (await tableEmpty(properties)) {
+      if (!inmoIds) {
+        const findId = async (email) => {
+          const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+          return u?.id;
+        };
+        inmoIds = {
+          inmoId:  await findId('inmo@rentar.com.ar'),
+          inmo2Id: await findId('sur@rentar.com.ar'),
+          inmo3Id: await findId('velez@rentar.com.ar'),
+          inmo4Id: await findId('bustos@rentar.com.ar'),
+        };
+      }
+      await seedProperties(ciudadId, inmoIds);
+    }
+
+    if (await tableEmpty(banners))       await seedBanners();
+    if (await tableEmpty(profesionales)) await seedProfesionales();
+  } else {
+    console.log('[db] entorno de producción — sin datos de prueba');
+  }
 
   console.log('[db] listo ✓');
 }
