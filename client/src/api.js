@@ -1,6 +1,12 @@
 import axios from 'axios';
 
-export const api = axios.create({ baseURL: '/api' });
+// En producción (Vercel) usa la URL de Railway via VITE_API_URL.
+// En desarrollo el proxy de Vite redirige /api → localhost:4000.
+const BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
+
+export const api = axios.create({ baseURL: BASE });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');

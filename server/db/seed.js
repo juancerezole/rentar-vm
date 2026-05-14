@@ -176,3 +176,10 @@ export async function initDb() {
 
   console.log('[db] listo ✓');
 }
+
+// Permite ejecutar como script standalone: node db/seed.js
+if (process.argv[1].endsWith('seed.js')) {
+  initDb()
+    .then(() => process.exit(0))
+    .catch(err => { console.error(err); process.exit(1); });
+}

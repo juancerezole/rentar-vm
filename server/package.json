@@ -7,6 +7,7 @@
     "dev": "node --watch --no-warnings index.js",
     "start": "node --no-warnings index.js",
     "db:push": "drizzle-kit push",
+    "db:setup": "drizzle-kit push && node --no-warnings db/seed.js",
     "db:studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
