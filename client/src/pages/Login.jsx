@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { LogIn } from 'lucide-react';
 
@@ -12,6 +12,8 @@ const QUICK = [
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const resetOk = searchParams.get('reset') === 'ok';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
@@ -41,12 +43,23 @@ export default function Login() {
           </div>
         </div>
 
+        {resetOk && (
+          <div className="mb-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 rounded-xl px-4 py-3 text-sm text-green-700 dark:text-green-400">
+            ¡Contraseña actualizada! Ya podés iniciar sesión.
+          </div>
+        )}
+
         <form onSubmit={onSubmit} className="space-y-4">
           <Field label="Email">
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className={inputCls} />
           </Field>
           <Field label="Contraseña">
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className={inputCls} />
+            <div className="text-right mt-1.5">
+              <Link to="/forgot-password" className="text-xs text-brand-mid dark:text-accent-orange hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
           </Field>
           {err && (
             <div className="text-sm text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-xl px-3 py-2.5">

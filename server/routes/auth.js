@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
+import { eq, and, gt, ilike } from 'drizzle-orm';
 import rateLimit from 'express-rate-limit';
 import { db } from '../db/index.js';
-import { users } from '../db/schema.js';
+import { users, passwordResetTokens } from '../db/schema.js';
 import { authRequired, signToken } from '../middleware/auth.js';
+import { sendPasswordReset } from '../services/email.js';
 
 // Almacenamiento en memoria — aceptable para un solo servidor.
 // Al escalar a múltiples instancias, reemplazar con RedisStore.
@@ -22,6 +24,14 @@ const registerLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiados registros desde esta IP. Esperá 1 hora.' },
+});
+
+const forgotLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas solicitudes. Esperá 1 hora e intentá de nuevo.' },
 });
 
 const router = Router();
@@ -73,6 +83,75 @@ router.get('/me', authRequired, wrap(async (req, res) => {
   const [user] = await db.select(PUBLIC_FIELDS).from(users).where(eq(users.id, req.user.id));
   if (!user) return res.status(404).json({ error: 'usuario no encontrado' });
   res.json({ user });
+}));
+
+// ── POST /forgot-password ─────────────────────────────────────────────────────
+// Siempre devuelve el mismo mensaje para no revelar si el email existe o no.
+router.post('/forgot-password', forgotLimiter, wrap(async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ error: 'falta el email' });
+
+  const OK = { ok: true, message: 'Si el email está registrado, vas a recibir un link en breve.' };
+
+  const [user] = await db
+    .select({ id: users.id, nombre: users.nombre, email: users.email })
+    .from(users)
+    .where(ilike(users.email, email.trim()));
+
+  if (!user) return res.json(OK); // email no existe — respuesta idéntica
+
+  // Invalida tokens anteriores de este usuario
+  await db
+    .update(passwordResetTokens)
+    .set({ used: true })
+    .where(and(
+      eq(passwordResetTokens.user_id, user.id),
+      eq(passwordResetTokens.used, false),
+    ));
+
+  const token     = randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+  await db.insert(passwordResetTokens).values({
+    user_id:    user.id,
+    token,
+    expires_at: expiresAt,
+  });
+
+  const resetUrl = `${process.env.CLIENT_ORIGIN}/reset-password?token=${token}`;
+  await sendPasswordReset(user.email, user.nombre, resetUrl);
+
+  res.json(OK);
+}));
+
+// ── POST /reset-password ──────────────────────────────────────────────────────
+router.post('/reset-password', wrap(async (req, res) => {
+  const { token, password } = req.body || {};
+  if (!token || !password) return res.status(400).json({ error: 'faltan campos' });
+  if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres.' });
+
+  const [record] = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(and(
+      eq(passwordResetTokens.token, token),
+      eq(passwordResetTokens.used, false),
+      gt(passwordResetTokens.expires_at, new Date()),
+    ));
+
+  if (!record) return res.status(400).json({ error: 'El link expiró o ya fue utilizado.' });
+
+  // Actualiza contraseña e invalida el token
+  await Promise.all([
+    db.update(users)
+      .set({ password_hash: bcrypt.hashSync(password, 10) })
+      .where(eq(users.id, record.user_id)),
+    db.update(passwordResetTokens)
+      .set({ used: true })
+      .where(eq(passwordResetTokens.id, record.id)),
+  ]);
+
+  res.json({ ok: true });
 }));
 
 export default router;
