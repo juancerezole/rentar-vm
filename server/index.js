@@ -38,7 +38,7 @@ app.use('/api',            miscRoutes);
 
 app.use((err, _req, res, _next) => {
   logger.error(err, 'error interno');
-  res.status(500).json({ error: 'error interno' });
+  res.status(500).json({ error: err.message || 'error interno' });
 });
 
 async function main() {
