@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 import { api } from '../api.js';
+import { inputCls } from '../components/ui/FormField.jsx';
 
 export default function ResetPassword() {
   const [searchParams]        = useSearchParams();
@@ -106,4 +107,3 @@ export default function ResetPassword() {
   );
 }
 
-const inputCls = 'w-full px-3 py-2.5 rounded-xl border border-ink-200 dark:border-night-border bg-white dark:bg-night-elevated text-ink-900 dark:text-night-text text-sm focus:ring-2 focus:ring-brand-soft dark:focus:ring-accent-orange/15 focus:border-brand-mid dark:focus:border-accent-orange outline-none transition';

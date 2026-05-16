@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api, formatPrice, tipoLabel, TIPOS } from '../api.js';
 import { Plus, Pencil, Trash2, X, Building2, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import ConfirmModal from '../components/ConfirmModal.jsx';
+import { inputCls, Field } from '../components/ui/FormField.jsx';
 
 const EMPTY_FORM = {
   titulo: '', tipo: 'departamento', direccion: '', barrio: '',
@@ -27,13 +29,15 @@ export default function InmobiliariaDashboard() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null); // id a eliminar
+  const [formError, setFormError] = useState('');
 
   function load() {
-    api.get('/properties/mine/list').then(r => setList(r.data.properties));
+    api.get('/properties/mine/list').then(r => setList(r.data.properties ?? [])).catch(console.error);
   }
   useEffect(() => {
     load();
-    api.get('/barrios').then(r => setBarrios(r.data.barrios));
+    api.get('/barrios').then(r => setBarrios(r.data.barrios ?? [])).catch(console.error);
   }, []);
 
   function startCreate() { setEditingId(null); setForm(EMPTY_FORM); setOpen(true); }
@@ -53,6 +57,7 @@ export default function InmobiliariaDashboard() {
 
   async function onSubmit(e) {
     e.preventDefault();
+    setFormError('');
     setSaving(true);
     try {
       const payload = { ...form, precio_anterior: form.precio_anterior || null };
@@ -60,13 +65,13 @@ export default function InmobiliariaDashboard() {
       else await api.post('/properties', payload);
       setOpen(false); load();
     } catch (err) {
-      alert(err.response?.data?.error || 'Error al guardar');
+      setFormError(err.response?.data?.error || 'Error al guardar');
     } finally { setSaving(false); }
   }
 
   async function onDelete(id) {
-    if (!confirm('¿Eliminar esta propiedad?')) return;
     await api.delete(`/properties/${id}`);
+    setConfirmDelete(null);
     load();
   }
 
@@ -123,7 +128,7 @@ export default function InmobiliariaDashboard() {
                 <button onClick={() => startEdit(p)} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-ink-600 dark:text-night-muted hover:bg-ink-100 dark:hover:bg-night-elevated rounded-lg py-1.5 transition">
                   <Pencil className="w-3.5 h-3.5" /> Editar
                 </button>
-                <button onClick={() => onDelete(p.id)} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg py-1.5 transition">
+                <button onClick={() => setConfirmDelete(p.id)} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg py-1.5 transition">
                   <Trash2 className="w-3.5 h-3.5" /> Eliminar
                 </button>
               </div>
@@ -131,6 +136,16 @@ export default function InmobiliariaDashboard() {
           </div>
         ))}
       </div>
+
+      {confirmDelete && (
+        <ConfirmModal
+          title="Eliminar propiedad"
+          message="Esta acción no se puede deshacer. La propiedad se eliminará permanentemente."
+          confirmLabel="Eliminar"
+          onConfirm={() => onDelete(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
 
       {open && (
         <div
@@ -244,6 +259,12 @@ export default function InmobiliariaDashboard() {
                 <p className="text-[11px] text-ink-400 dark:text-night-dim mt-1">Tip: elegí una imagen de muestra o pegá una URL.</p>
               </Field>
 
+              {formError && (
+                <div className="text-sm text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-xl px-3 py-2.5">
+                  {formError}
+                </div>
+              )}
+
               <div className="flex gap-2 pt-4 border-t border-ink-100 dark:border-night-border">
                 <button type="button" onClick={() => setOpen(false)}
                   className="flex-1 py-2.5 rounded-xl border border-ink-200 dark:border-night-border font-semibold text-ink-600 dark:text-night-muted hover:bg-ink-100 dark:hover:bg-night-elevated transition">
@@ -262,16 +283,6 @@ export default function InmobiliariaDashboard() {
   );
 }
 
-const inputCls = 'w-full px-3 py-2.5 rounded-xl border border-ink-200 dark:border-night-border bg-white dark:bg-night-elevated text-ink-900 dark:text-night-text text-sm focus:ring-2 focus:ring-brand-soft dark:focus:ring-accent-orange/15 focus:border-brand-mid dark:focus:border-accent-orange outline-none transition';
-
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium text-ink-700 dark:text-night-muted mb-1.5">{label}</span>
-      {children}
-    </label>
-  );
-}
 
 function Check({ label, checked, onChange }) {
   return (

@@ -3,6 +3,7 @@ import { eq, and, gte, lte, ilike, or, desc, getTableColumns, sql } from 'drizzl
 import { db, pool } from '../db/index.js';
 import { properties as propsTable, users, ciudades } from '../db/schema.js';
 import { authRequired, requireRole } from '../middleware/auth.js';
+import { validate, propertySchema } from '../middleware/validate.js';
 
 const router = Router();
 const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
@@ -208,11 +209,8 @@ router.get('/:id', wrap(async (req, res) => {
 }));
 
 // ── POST / — crear propiedad (Drizzle ORM) ────────────────────────────────────
-router.post('/', authRequired, requireRole('inmobiliaria', 'admin'), wrap(async (req, res) => {
-  const b = req.body || {};
-  const required = ['titulo', 'tipo', 'direccion', 'barrio', 'precio'];
-  for (const f of required) if (!b[f]) return res.status(400).json({ error: `falta ${f}` });
-
+router.post('/', authRequired, requireRole('inmobiliaria', 'admin'), validate(propertySchema), wrap(async (req, res) => {
+  const b = req.body;
   const ciudadId = await getDefaultCiudadId();
 
   const [row] = await db.insert(propsTable).values({
@@ -222,17 +220,17 @@ router.post('/', authRequired, requireRole('inmobiliaria', 'admin'), wrap(async 
     tipo:               b.tipo,
     direccion:          b.direccion,
     barrio:             b.barrio,
-    precio:             Number(b.precio),
-    precio_anterior:    b.precio_anterior ? Number(b.precio_anterior) : null,
-    ambientes:          Number(b.ambientes   || 1),
-    banos:              Number(b.banos       || 1),
-    superficie:         Number(b.superficie  || 0),
-    garantia:           b.garantia || 'requerida',
-    mascotas:           !!b.mascotas,
-    amoblado:           !!b.amoblado,
-    expensas_incluidas: !!b.expensas_incluidas,
-    destacado:          req.user.rol === 'admin' ? !!b.destacado : false,
-    liquidacion:        !!b.liquidacion,
+    precio:             b.precio,
+    precio_anterior:    b.precio_anterior || null,
+    ambientes:          b.ambientes,
+    banos:              b.banos,
+    superficie:         b.superficie,
+    garantia:           b.garantia,
+    mascotas:           b.mascotas,
+    amoblado:           b.amoblado,
+    expensas_incluidas: b.expensas_incluidas,
+    destacado:          req.user.rol === 'admin' ? b.destacado : false,
+    liquidacion:        b.liquidacion,
     descripcion:        b.descripcion || null,
     imagen:             b.imagen      || null,
   }).returning();

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { UserPlus, Building2, User } from 'lucide-react';
+import { inputCls, Field } from '../components/ui/FormField.jsx';
 
 export default function Register() {
   const { register } = useAuth();
@@ -63,7 +64,7 @@ export default function Register() {
             <input type="email" value={form.email} onChange={e => set('email', e.target.value)} required className={inputCls} />
           </Field>
           <Field label="Contraseña">
-            <input type="password" minLength={4} value={form.password} onChange={e => set('password', e.target.value)} required className={inputCls} />
+            <input type="password" minLength={8} value={form.password} onChange={e => set('password', e.target.value)} required className={inputCls} />
           </Field>
           {form.rol === 'inmobiliaria' && (
             <Field label="Nombre de la inmobiliaria">
@@ -99,16 +100,6 @@ export default function Register() {
   );
 }
 
-const inputCls = 'w-full px-3 py-2.5 rounded-xl border border-ink-200 dark:border-night-border bg-white dark:bg-night-elevated text-ink-900 dark:text-night-text text-sm focus:ring-2 focus:ring-brand-soft dark:focus:ring-accent-orange/15 focus:border-brand-mid dark:focus:border-accent-orange outline-none transition';
-
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <span className="block text-sm font-medium text-ink-700 dark:text-night-muted mb-1.5">{label}</span>
-      {children}
-    </label>
-  );
-}
 
 function RoleBtn({ active, onClick, icon, label, hint }) {
   return (
