@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { eq, desc, sql } from 'drizzle-orm';
 import { db, pool } from '../db/index.js';
-import { banners, profesionales, properties, users, ciudades } from '../db/schema.js';
+import { banners, profesionales, properties, users } from '../db/schema.js';
 import { authRequired, requireRole } from '../middleware/auth.js';
 import { cacheControl } from '../middleware/cache.js';
 
