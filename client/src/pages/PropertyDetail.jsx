@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, formatPrice, tipoLabel } from '../api.js';
-import { ArrowLeft, MapPin, BedDouble, Bath, Maximize, Phone, Mail, Building2, Sparkles } from 'lucide-react';
+import { ArrowLeft, MapPin, BedDouble, Bath, Maximize, Phone, Mail, Building2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function PropertyDetail() {
   const { id } = useParams();
-  const [p, setP] = useState(null);
-  const [err, setErr] = useState(false);
+  const [p, setP]         = useState(null);
+  const [err, setErr]     = useState(false);
+  const [current, setCurrent] = useState(0);
 
   useEffect(() => {
     api.get(`/properties/${id}`)
-      .then(r => setP(r.data.property))
+      .then(r => { setP(r.data.property); setCurrent(0); })
       .catch(() => setErr(true));
   }, [id]);
 
@@ -28,6 +29,15 @@ export default function PropertyDetail() {
   const desc = p.precio_anterior && p.precio_anterior > p.precio
     ? Math.round(((p.precio_anterior - p.precio) / p.precio_anterior) * 100) : 0;
 
+  const photos = p.images?.length > 0
+    ? p.images.map(i => i.url)
+    : p.imagen ? [p.imagen] : [];
+
+  const mainPhoto = photos[current] ?? null;
+
+  function prev() { setCurrent(c => (c - 1 + photos.length) % photos.length); }
+  function next() { setCurrent(c => (c + 1) % photos.length); }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
       <Link
@@ -38,9 +48,15 @@ export default function PropertyDetail() {
       </Link>
 
       <div className="bg-white dark:bg-night-card rounded-2xl border border-ink-200 dark:border-night-border shadow-soft dark:shadow-dark-card overflow-hidden">
-        <div className="aspect-[16/9] bg-ink-100 dark:bg-night-elevated relative">
-          {p.imagen && (
-            <img src={p.imagen} alt={p.titulo} className="w-full h-full object-cover" />
+
+        {/* Galería de fotos */}
+        <div className="aspect-[16/9] bg-ink-100 dark:bg-night-elevated relative group">
+          {mainPhoto ? (
+            <img src={mainPhoto} alt={p.titulo} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-ink-300 dark:text-night-dim text-sm">
+              Sin fotos
+            </div>
           )}
           {p.destacado && (
             <span className="absolute top-4 left-4 inline-flex items-center gap-1 bg-accent-gold text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-soft">
@@ -52,7 +68,51 @@ export default function PropertyDetail() {
               -{desc}% liquidación
             </span>
           )}
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={prev}
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={next}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {photos.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrent(i)}
+                    className={`w-1.5 h-1.5 rounded-full transition ${i === current ? 'bg-white scale-125' : 'bg-white/50 hover:bg-white/75'}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Tiras de miniaturas */}
+        {photos.length > 1 && (
+          <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-thin border-b border-ink-100 dark:border-night-border bg-ink-50 dark:bg-night-elevated">
+            {photos.map((src, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrent(i)}
+                className={`shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition ${
+                  i === current
+                    ? 'border-brand dark:border-accent-orange shadow-soft'
+                    : 'border-transparent opacity-60 hover:opacity-100'
+                }`}
+              >
+                <img src={src} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2">

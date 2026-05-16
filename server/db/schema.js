@@ -81,6 +81,17 @@ export const passwordResetTokens = pgTable('password_reset_tokens', {
   created_at: timestamp('created_at').defaultNow(),
 });
 
+export const propertyImages = pgTable('property_images', {
+  id:          serial('id').primaryKey(),
+  property_id: integer('property_id').notNull().references(() => properties.id, { onDelete: 'cascade' }),
+  url:         text('url').notNull(),
+  public_id:   text('public_id').notNull(),
+  orden:       integer('orden').notNull().default(0),
+  created_at:  timestamp('created_at').defaultNow(),
+}, (t) => [
+  index('idx_property_images_property_id').on(t.property_id),
+]);
+
 export const profesionales = pgTable('profesionales', {
   id:        serial('id').primaryKey(),
   nombre:    text('nombre').notNull(),
