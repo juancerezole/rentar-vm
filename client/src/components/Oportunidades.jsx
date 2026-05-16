@@ -8,8 +8,8 @@ export default function Oportunidades() {
   const [cheapest, setCheapest] = useState([]);
 
   useEffect(() => {
-    api.get('/properties', { params: { liquidacion: 'true' } }).then(r => setLiquidacion(r.data.properties));
-    api.get('/properties/cheapest-by-barrio').then(r => setCheapest(r.data.properties));
+    api.get('/properties', { params: { liquidacion: 'true' } }).then(r => setLiquidacion(r.data.properties ?? [])).catch(console.error);
+    api.get('/properties/cheapest-by-barrio').then(r => setCheapest(r.data.properties ?? [])).catch(console.error);
   }, []);
 
   return (

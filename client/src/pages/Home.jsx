@@ -29,8 +29,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get('/barrios').then(r => setBarrios(r.data.barrios));
-    api.get('/stats/summary').then(r => setStats(r.data));
+    api.get('/barrios').then(r => setBarrios(r.data.barrios ?? [])).catch(console.error);
+    api.get('/stats/summary').then(r => setStats(r.data)).catch(console.error);
   }, []);
 
   // Cambia filtros y vuelve a página 1
@@ -46,17 +46,19 @@ export default function Home() {
   }, [filters, page]);
 
   useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
     const t = setTimeout(() => {
-      api.get('/properties', { params })
+      api.get('/properties', { params, signal: controller.signal })
         .then(r => setResult({
           properties: r.data.properties,
           total:      r.data.total,
           totalPages: r.data.totalPages,
         }))
+        .catch(err => { if (!api.isCancel?.(err) && err.code !== 'ERR_CANCELED') console.error(err); })
         .finally(() => setLoading(false));
     }, 200);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); controller.abort(); };
   }, [params]);
 
   const changePage = (newPage) => {

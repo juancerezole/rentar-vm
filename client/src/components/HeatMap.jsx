@@ -6,7 +6,7 @@ export default function HeatMap({ onSelect }) {
   const [data, setData] = useState([]);
 
   useEffect(() => {
-    api.get('/barrios/heatmap').then(r => setData(r.data.heatmap));
+    api.get('/barrios/heatmap').then(r => setData(r.data.heatmap ?? [])).catch(console.error);
   }, []);
 
   if (!data.length) return null;
