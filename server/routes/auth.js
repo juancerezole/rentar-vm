@@ -7,6 +7,7 @@ import { db } from '../db/index.js';
 import { users, passwordResetTokens } from '../db/schema.js';
 import { authRequired, signToken } from '../middleware/auth.js';
 import { sendPasswordReset } from '../services/email.js';
+import { validate, registerSchema, loginSchema, forgotSchema, resetSchema } from '../middleware/validate.js';
 
 // Almacenamiento en memoria — aceptable para un solo servidor.
 // Al escalar a múltiples instancias, reemplazar con RedisStore.
@@ -46,10 +47,9 @@ const PUBLIC_FIELDS = {
   telefono: users.telefono,
 };
 
-router.post('/register', registerLimiter, wrap(async (req, res) => {
-  const { nombre, email, password, rol = 'usuario', empresa, telefono } = req.body || {};
-  if (!nombre || !email || !password) return res.status(400).json({ error: 'faltan campos' });
-  if (!['usuario', 'inmobiliaria'].includes(rol)) return res.status(400).json({ error: 'rol invalido' });
+router.post('/register', registerLimiter, validate(registerSchema), wrap(async (req, res) => {
+  const { nombre, password, rol, empresa, telefono } = req.body;
+  const email = req.body.email.toLowerCase().trim();
 
   const [exists] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
   if (exists) return res.status(409).json({ error: 'email ya registrado' });
@@ -66,9 +66,9 @@ router.post('/register', registerLimiter, wrap(async (req, res) => {
   res.json({ token: signToken(user), user });
 }));
 
-router.post('/login', loginLimiter, wrap(async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'faltan campos' });
+router.post('/login', loginLimiter, validate(loginSchema), wrap(async (req, res) => {
+  const { password } = req.body;
+  const email = req.body.email.toLowerCase().trim();
 
   const [row] = await db.select().from(users).where(eq(users.email, email));
   if (!row || !bcrypt.compareSync(password, row.password_hash)) {
@@ -87,9 +87,8 @@ router.get('/me', authRequired, wrap(async (req, res) => {
 
 // ── POST /forgot-password ─────────────────────────────────────────────────────
 // Siempre devuelve el mismo mensaje para no revelar si el email existe o no.
-router.post('/forgot-password', forgotLimiter, wrap(async (req, res) => {
-  const { email } = req.body || {};
-  if (!email) return res.status(400).json({ error: 'falta el email' });
+router.post('/forgot-password', forgotLimiter, validate(forgotSchema), wrap(async (req, res) => {
+  const { email } = req.body;
 
   const OK = { ok: true, message: 'Si el email está registrado, vas a recibir un link en breve.' };
 
@@ -125,10 +124,8 @@ router.post('/forgot-password', forgotLimiter, wrap(async (req, res) => {
 }));
 
 // ── POST /reset-password ──────────────────────────────────────────────────────
-router.post('/reset-password', wrap(async (req, res) => {
-  const { token, password } = req.body || {};
-  if (!token || !password) return res.status(400).json({ error: 'faltan campos' });
-  if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres.' });
+router.post('/reset-password', validate(resetSchema), wrap(async (req, res) => {
+  const { token, password } = req.body;
 
   const [record] = await db
     .select()
