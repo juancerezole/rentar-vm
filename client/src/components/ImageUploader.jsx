@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
-import { Upload, X, Loader2, ImagePlus, GripVertical } from 'lucide-react';
+import { X, Loader2, ImagePlus } from 'lucide-react';
 import { api } from '../api.js';
+import { MAX_IMAGES_PER_PROPERTY, MAX_UPLOAD_MB } from '../constants.js';
 
 const CLOUD_NAME    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = 'rentar_properties';
-const MAX_IMAGES    = 10;
-const MAX_MB        = 5;
+const MAX_IMAGES    = MAX_IMAGES_PER_PROPERTY;
+const MAX_MB        = MAX_UPLOAD_MB;
 
 export default function ImageUploader({ propertyId, images, onImagesChange }) {
   const [uploading, setUploading] = useState(false);

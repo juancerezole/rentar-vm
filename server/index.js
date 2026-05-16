@@ -7,11 +7,12 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import authRoutes from './routes/auth.js';
-import propertiesRoutes from './routes/properties.js';
+import propertiesRoutes from './routes/properties/index.js';
 import miscRoutes from './routes/misc.js';
 import { errorHandler } from './middleware/error.js';
 import { db, pool } from './db/index.js';
 import { initDb } from './db/seed.js';
+import { JSON_BODY_LIMIT } from './constants.js';
 import logger from './logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -26,7 +27,7 @@ app.set('trust proxy', config.trustProxy);
 app.use(helmet());
 app.use(compression());
 app.use(cors({ origin: config.clientOrigin }));
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
 // Health check con ping real a la base de datos
 app.get('/api/health', async (_req, res) => {

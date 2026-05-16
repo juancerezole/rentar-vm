@@ -8,9 +8,10 @@ import { authRequired, signToken } from '../middleware/auth.js';
 import { sendPasswordReset } from '../services/email.js';
 import { validate, registerSchema, loginSchema, forgotSchema, resetSchema } from '../middleware/validate.js';
 import { loginLimiter, registerLimiter, forgotLimiter } from '../middleware/rateLimit.js';
+import { wrap } from '../utils/asyncHandler.js';
+import { BCRYPT_COST, PASSWORD_RESET_TOKEN_TTL_MS } from '../constants.js';
 
 const router = Router();
-const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
 
 const PUBLIC_FIELDS = {
   id:       users.id,
@@ -28,7 +29,7 @@ router.post('/register', registerLimiter, validate(registerSchema), wrap(async (
   const [exists] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
   if (exists) return res.status(409).json({ error: 'email ya registrado' });
 
-  const password_hash = await bcrypt.hash(password, 10);
+  const password_hash = await bcrypt.hash(password, BCRYPT_COST);
   const [user] = await db.insert(users).values({
     nombre,
     email,
@@ -88,7 +89,7 @@ router.post('/forgot-password', forgotLimiter, validate(forgotSchema), wrap(asyn
     ));
 
   const token     = randomBytes(32).toString('hex');
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
 
   await db.insert(passwordResetTokens).values({
     user_id:    user.id,
@@ -117,7 +118,7 @@ router.post('/reset-password', validate(resetSchema), wrap(async (req, res) => {
 
   if (!record) return res.status(400).json({ error: 'El link expiró o ya fue utilizado.' });
 
-  const password_hash = await bcrypt.hash(password, 10);
+  const password_hash = await bcrypt.hash(password, BCRYPT_COST);
   await Promise.all([
     db.update(users)
       .set({ password_hash })

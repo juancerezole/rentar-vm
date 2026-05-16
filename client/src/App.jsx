@@ -10,6 +10,7 @@ import PropertyDetail from './pages/PropertyDetail.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import Toaster from './components/Toaster.jsx';
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Footer />
+      <Toaster />
     </div>
     </ErrorBoundary>
   );

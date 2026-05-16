@@ -4,16 +4,13 @@ import { db, pool } from '../db/index.js';
 import { banners, profesionales, properties, users } from '../db/schema.js';
 import { authRequired, requireRole } from '../middleware/auth.js';
 import { cacheControl } from '../middleware/cache.js';
+import { parsePagination, buildPageMeta } from '../utils/pagination.js';
+import { wrap } from '../utils/asyncHandler.js';
+import { parseId } from '../utils/parseId.js';
 
 const router = Router();
-const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
 
 const VALID_ROLES = ['admin', 'inmobiliaria', 'usuario'];
-
-function parseId(param) {
-  const n = Number(param);
-  return Number.isInteger(n) && n > 0 ? n : null;
-}
 
 // Devuelve la cantidad de admins en el sistema — usado para evitar que el
 // último admin pierda privilegios o sea eliminado.
@@ -113,17 +110,49 @@ router.get('/stats/summary', wrap(async (_req, res) => {
 }));
 
 // ── Admin: usuarios ───────────────────────────────────────────────────────────
-router.get('/admin/users', authRequired, requireRole('admin'), wrap(async (_req, res) => {
-  const { rows } = await pool.query(`
+router.get('/admin/users', authRequired, requireRole('admin'), wrap(async (req, res) => {
+  const { page, limit, offset } = parsePagination(req, { defaultLimit: 25, maxLimit: 100 });
+  const search = String(req.query.q || '').trim();
+
+  // Búsqueda opcional por nombre o email (case-insensitive)
+  const params = [];
+  let whereClause = '';
+  if (search) {
+    params.push(`%${search}%`);
+    whereClause = `WHERE u.nombre ILIKE $1 OR u.email ILIKE $1`;
+  }
+
+  const countSql = `SELECT COUNT(*)::int AS count FROM users u ${whereClause}`;
+  const dataSql = `
     SELECT
       u.id, u.nombre, u.email, u.rol, u.empresa, u.telefono, u.created_at,
       COUNT(p.id)::int AS propiedades
     FROM users u
     LEFT JOIN properties p ON p.user_id = u.id
+    ${whereClause}
     GROUP BY u.id
     ORDER BY u.created_at DESC
-  `);
-  res.json({ users: rows });
+    LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+  `;
+
+  // Breakdown por rol es global (no afectado por filtros/paginación)
+  // para que el dashboard pueda mostrar totales reales.
+  const [countResult, dataResult, byRolResult] = await Promise.all([
+    pool.query(countSql, params),
+    pool.query(dataSql, [...params, limit, offset]),
+    pool.query(`SELECT rol, COUNT(*)::int AS count FROM users GROUP BY rol`),
+  ]);
+
+  const byRol = byRolResult.rows.reduce(
+    (acc, r) => ({ ...acc, [r.rol]: r.count }),
+    { admin: 0, inmobiliaria: 0, usuario: 0 },
+  );
+
+  res.json({
+    users: dataResult.rows,
+    byRol,
+    ...buildPageMeta(countResult.rows[0].count, page, limit),
+  });
 }));
 
 // Cambiar rol de un usuario. Reglas:

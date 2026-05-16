@@ -4,7 +4,11 @@ import { Plus, Pencil, Trash2, X, Building2, Image as ImageIcon, Sparkles, Camer
 import { useAuth } from '../context/AuthContext.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import ImageUploader from '../components/ImageUploader.jsx';
+import Pagination from '../components/Pagination.jsx';
 import { inputCls, Field } from '../components/ui/FormField.jsx';
+import { PAGE_SIZE_DASHBOARD } from '../constants.js';
+
+const PAGE_LIMIT = PAGE_SIZE_DASHBOARD;
 
 const EMPTY_FORM = {
   titulo: '', tipo: 'departamento', direccion: '', barrio: '',
@@ -16,6 +20,9 @@ const EMPTY_FORM = {
 export default function InmobiliariaDashboard() {
   const { user } = useAuth();
   const [list, setList]                 = useState([]);
+  const [page, setPage]                 = useState(1);
+  const [totalPages, setTotalPages]     = useState(1);
+  const [total, setTotal]               = useState(0);
   const [barrios, setBarrios]           = useState([]);
   const [open, setOpen]                 = useState(false);
   const [step, setStep]                 = useState('form'); // 'form' | 'photos'
@@ -26,12 +33,22 @@ export default function InmobiliariaDashboard() {
   const [formError, setFormError]       = useState('');
   const [images, setImages]             = useState([]);
 
-  function load() {
-    api.get('/properties/mine/list').then(r => setList(r.data.properties ?? [])).catch(console.error);
+  function load(targetPage = page) {
+    api.get('/properties/mine/list', { params: { page: targetPage, limit: PAGE_LIMIT } })
+      .then(r => {
+        setList(r.data.properties ?? []);
+        setTotalPages(r.data.totalPages ?? 1);
+        setTotal(r.data.total ?? 0);
+      })
+      .catch(console.error);
   }
 
   useEffect(() => {
-    load();
+    load(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  useEffect(() => {
     api.get('/barrios').then(r => setBarrios(r.data.barrios ?? [])).catch(console.error);
   }, []);
 
@@ -95,7 +112,9 @@ export default function InmobiliariaDashboard() {
   async function onDelete(id) {
     await api.delete(`/properties/${id}`);
     setConfirmDelete(null);
-    load();
+    // si era la última de la página, retrocedo
+    if (list.length === 1 && page > 1) setPage(p => p - 1);
+    else load();
   }
 
   return (
@@ -105,6 +124,9 @@ export default function InmobiliariaDashboard() {
           <h1 className="text-2xl font-bold text-ink-900 dark:text-night-text flex items-center gap-2">
             <Building2 className="w-6 h-6 text-brand-mid dark:text-accent-orange" />
             Mis propiedades
+            {total > 0 && (
+              <span className="text-sm font-medium text-ink-400 dark:text-night-dim">· {total}</span>
+            )}
           </h1>
           <p className="text-sm text-ink-400 dark:text-night-dim mt-0.5">
             {user?.empresa ? `${user.empresa} · ` : ''}Cargá, editá y publicá tus alquileres.
@@ -159,6 +181,12 @@ export default function InmobiliariaDashboard() {
           </div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-6">
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+        </div>
+      )}
 
       {confirmDelete && (
         <ConfirmModal

@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { eq, sql } from 'drizzle-orm';
 import { db } from './index.js';
 import { ciudades, users, barrios, properties, banners, profesionales } from './schema.js';
+import { BCRYPT_COST } from '../constants.js';
 
 async function tableEmpty(table) {
   const [{ c }] = await db.select({ c: sql`count(*)::int` }).from(table);
@@ -29,7 +30,7 @@ async function seedUsers() {
     { nombre: 'Bustos & Asoc.',      email: 'bustos@rentar.com.ar', password: 'bustos123', rol: 'inmobiliaria', empresa: 'Bustos & Asociados', telefono: '03534-444-4444' },
     { nombre: 'Usuario Demo',        email: 'user@rentar.com.ar',  password: 'user123',  rol: 'usuario',      empresa: null,                  telefono: '03534-555-5555' },
   ];
-  const hashes = await Promise.all(seeds.map(s => bcrypt.hash(s.password, 10)));
+  const hashes = await Promise.all(seeds.map(s => bcrypt.hash(s.password, BCRYPT_COST)));
   const rows = await db.insert(users).values(
     seeds.map((s, i) => ({
       nombre:        s.nombre,
@@ -63,6 +64,11 @@ async function seedBarrios(ciudadId) {
 }
 
 async function seedProperties(ciudadId, { inmoId, inmo2Id, inmo3Id, inmo4Id }) {
+  // Mapeo nombre → id de barrios para poblar la FK barrio_id en cada insert.
+  // Si más adelante se hace barrio_id NOT NULL, este map evita falla.
+  const barrioRows = await db.select({ id: barrios.id, nombre: barrios.nombre }).from(barrios);
+  const barrioMap = Object.fromEntries(barrioRows.map(b => [b.nombre, b.id]));
+
   const IMG = {
     depto1: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=900',
     depto2: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900',
@@ -85,7 +91,7 @@ async function seedProperties(ciudadId, { inmoId, inmo2Id, inmo3Id, inmo4Id }) {
   };
 
   const p = (user_id, titulo, tipo, direccion, barrio, precio, precio_anterior, ambientes, banos, superficie, garantia, mascotas, amoblado, expensas_incluidas, destacado, liquidacion, descripcion, imagen) =>
-    ({ ciudad_id: ciudadId, user_id, titulo, tipo, direccion, barrio, precio, precio_anterior, ambientes, banos, superficie, garantia, mascotas, amoblado, expensas_incluidas, destacado, liquidacion, descripcion, imagen });
+    ({ ciudad_id: ciudadId, user_id, titulo, tipo, direccion, barrio, barrio_id: barrioMap[barrio] ?? null, precio, precio_anterior, ambientes, banos, superficie, garantia, mascotas, amoblado, expensas_incluidas, destacado, liquidacion, descripcion, imagen });
 
   await db.insert(properties).values([
     p(inmoId,  'Departamento luminoso 2 amb. con balcón',    'departamento','Bv. Sarmiento 540',       'Centro',           280000,null,2,1,55, 'requerida',false,true, true, true, false,'Departamento amoblado a metros de la peatonal. Ideal para profesionales.',IMG.depto1),

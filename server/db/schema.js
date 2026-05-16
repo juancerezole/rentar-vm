@@ -39,7 +39,11 @@ export const properties = pgTable('properties', {
   titulo:            text('titulo').notNull(),
   tipo:              text('tipo').notNull(),
   direccion:         text('direccion').notNull(),
+  // `barrio` (text) se mantiene por compatibilidad — el código todavía filtra
+  // y muestra usando el nombre. La FK `barrio_id` se introdujo en la
+  // migración 0003 para integridad. En una pasada futura se hace NOT NULL.
   barrio:            text('barrio').notNull(),
+  barrio_id:         integer('barrio_id').references(() => barrios.id, { onDelete: 'set null' }),
   precio:            integer('precio').notNull(),
   precio_anterior:   integer('precio_anterior'),
   ambientes:         integer('ambientes').notNull().default(1),
@@ -58,6 +62,7 @@ export const properties = pgTable('properties', {
   index('idx_properties_ciudad_id').on(t.ciudad_id),
   index('idx_properties_tipo').on(t.tipo),
   index('idx_properties_barrio').on(t.barrio),
+  index('idx_properties_barrio_id').on(t.barrio_id),
   index('idx_properties_precio').on(t.precio),
   index('idx_properties_created_at').on(t.created_at),
   index('idx_properties_user_id').on(t.user_id),

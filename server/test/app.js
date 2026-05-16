@@ -6,7 +6,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { config } from '../config.js';
 import authRoutes from '../routes/auth.js';
-import propertiesRoutes from '../routes/properties.js';
+import propertiesRoutes from '../routes/properties/index.js';
 import miscRoutes from '../routes/misc.js';
 import { errorHandler } from '../middleware/error.js';
 import { pool } from '../db/index.js';

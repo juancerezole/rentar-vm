@@ -1,28 +1,63 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Shield, Users, Trash2, Building2, Home, Crown, X } from 'lucide-react';
+import { Shield, Users, Trash2, Building2, Home, Crown, X, Search } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal.jsx';
+import Pagination from '../components/Pagination.jsx';
+import { PAGE_SIZE_TABLE } from '../constants.js';
+
+const PAGE_LIMIT = PAGE_SIZE_TABLE;
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
+  const [byRol, setByRol] = useState({ admin: 0, inmobiliaria: 0, usuario: 0 });
   const [stats, setStats] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null); // user object o null
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const [actionError, setActionError] = useState('');
 
-  function load() {
-    api.get('/admin/users').then(r => setUsers(r.data.users ?? [])).catch(console.error);
-    api.get('/stats/summary').then(r => setStats(r.data)).catch(console.error);
+  function loadUsers(targetPage = page, q = search) {
+    api.get('/admin/users', { params: { page: targetPage, limit: PAGE_LIMIT, q: q || undefined } })
+      .then(r => {
+        setUsers(r.data.users ?? []);
+        setTotalPages(r.data.totalPages ?? 1);
+        setTotal(r.data.total ?? 0);
+        if (r.data.byRol) setByRol(r.data.byRol);
+      })
+      .catch(console.error);
   }
-  useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    loadUsers(page, search);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, search]);
+
+  useEffect(() => {
+    api.get('/stats/summary').then(r => setStats(r.data)).catch(console.error);
+  }, []);
+
+  // debounce de búsqueda — 300ms entre tipear y disparar la query
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (searchInput !== search) {
+        setPage(1);
+        setSearch(searchInput);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput, search]);
 
   async function changeRol(id, rol) {
     setActionError('');
     try {
       await api.put(`/admin/users/${id}/rol`, { rol });
-      load();
+      loadUsers();
     } catch (e) {
       setActionError(e.response?.data?.error || 'No se pudo cambiar el rol.');
-      load(); // recarga para revertir el <select> al valor real
+      loadUsers();
     }
   }
 
@@ -31,16 +66,18 @@ export default function AdminDashboard() {
     try {
       await api.delete(`/admin/users/${user.id}`);
       setConfirmDelete(null);
-      load();
+      if (users.length === 1 && page > 1) setPage(p => p - 1);
+      else loadUsers();
     } catch (e) {
       setConfirmDelete(null);
       setActionError(e.response?.data?.error || 'No se pudo eliminar el usuario.');
     }
   }
 
-  const inmoCount  = users.filter(u => u.rol === 'inmobiliaria').length;
-  const userCount  = users.filter(u => u.rol === 'usuario').length;
-  const adminCount = users.filter(u => u.rol === 'admin').length;
+  // Contadores globales — byRol viene del endpoint y no depende de la página actual
+  const inmoCount  = byRol.inmobiliaria;
+  const userCount  = byRol.usuario;
+  const adminCount = byRol.admin;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -71,10 +108,20 @@ export default function AdminDashboard() {
       </div>
 
       <div className="bg-white dark:bg-night-card rounded-2xl border border-ink-200 dark:border-night-border shadow-soft overflow-hidden">
-        <div className="px-5 py-4 border-b border-ink-100 dark:border-night-border">
+        <div className="px-5 py-4 border-b border-ink-100 dark:border-night-border flex items-center gap-3">
           <h2 className="font-semibold text-ink-900 dark:text-night-text flex items-center gap-2">
             <Users className="w-4 h-4 text-ink-400 dark:text-night-dim" /> Usuarios registrados
+            <span className="text-xs font-medium text-ink-400 dark:text-night-dim">({total})</span>
           </h2>
+          <div className="ml-auto relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 dark:text-night-dim" />
+            <input
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              placeholder="Buscar por nombre o email..."
+              className="pl-9 pr-3 py-1.5 rounded-lg border border-ink-200 dark:border-night-border bg-white dark:bg-night-elevated text-sm text-ink-900 dark:text-night-text placeholder:text-ink-400 dark:placeholder:text-night-dim focus:border-brand-mid dark:focus:border-accent-orange focus:ring-2 focus:ring-brand-soft dark:focus:ring-accent-orange/15 outline-none transition w-64"
+            />
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -119,6 +166,11 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="px-5 py-3 border-t border-ink-100 dark:border-night-border">
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          </div>
+        )}
       </div>
 
       {confirmDelete && (
