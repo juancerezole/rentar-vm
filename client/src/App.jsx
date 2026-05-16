@@ -9,6 +9,7 @@ import AdminDashboard from './pages/AdminDashboard.jsx';
 import PropertyDetail from './pages/PropertyDetail.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 function Protected({ children, roles }) {
   const { user, loading } = useAuth();
@@ -20,6 +21,7 @@ function Protected({ children, roles }) {
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <div className="min-h-full bg-surface dark:bg-night-bg">
       <Header />
       <Routes>
@@ -39,6 +41,7 @@ export default function App() {
       </Routes>
       <Footer />
     </div>
+    </ErrorBoundary>
   );
 }
 

@@ -7,8 +7,8 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
 
   function load() {
-    api.get('/admin/users').then(r => setUsers(r.data.users));
-    api.get('/stats/summary').then(r => setStats(r.data));
+    api.get('/admin/users').then(r => setUsers(r.data.users ?? [])).catch(console.error);
+    api.get('/stats/summary').then(r => setStats(r.data)).catch(console.error);
   }
   useEffect(() => { load(); }, []);
 
