@@ -15,6 +15,13 @@
       "when": 1747440000000,
       "tag": "0001_add_property_images",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1747530000000,
+      "tag": "0002_ensure_property_images",
+      "breakpoints": true
     }
   ]
 }
