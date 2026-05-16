@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, formatPrice, tipoLabel } from '../api.js';
+import { calcularDescuento } from '../utils/property.js';
 import { Flame, TrendingDown } from 'lucide-react';
 
 export default function Oportunidades() {
@@ -30,7 +31,7 @@ export default function Oportunidades() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {liquidacion.map(p => {
-              const desc = p.precio_anterior ? Math.round(((p.precio_anterior - p.precio) / p.precio_anterior) * 100) : 0;
+              const desc = calcularDescuento(p);
               return (
                 <Link key={p.id} to={`/propiedad/${p.id}`} className="group bg-white rounded-2xl border border-accent-orange-border hover:border-accent-orange shadow-soft hover:shadow-card transition overflow-hidden">
                   <div className="relative h-32 bg-ink-100 overflow-hidden">

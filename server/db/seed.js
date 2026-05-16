@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { eq, sql } from 'drizzle-orm';
 import { db } from './index.js';
 import { ciudades, users, barrios, properties, banners, profesionales } from './schema.js';
@@ -21,15 +21,25 @@ async function seedCiudades() {
 }
 
 async function seedUsers() {
-  const hash = (p) => bcrypt.hashSync(p, 10);
-  const rows = await db.insert(users).values([
-    { nombre: 'Admin Demo',         email: 'admin@rentar.com.ar', password_hash: hash('admin123'), rol: 'admin',        empresa: null,                  telefono: '03534-000000' },
-    { nombre: 'Inmobiliaria Centro',email: 'inmo@rentar.com.ar',  password_hash: hash('inmo123'),  rol: 'inmobiliaria', empresa: 'Centro Propiedades',   telefono: '03534-411-1111' },
-    { nombre: 'Propiedades del Sur', email: 'sur@rentar.com.ar',  password_hash: hash('sur123'),   rol: 'inmobiliaria', empresa: 'Propiedades del Sur',  telefono: '03534-422-2222' },
-    { nombre: 'Inmobiliaria Vélez', email: 'velez@rentar.com.ar', password_hash: hash('velez123'), rol: 'inmobiliaria', empresa: 'Vélez Inmobiliaria',   telefono: '03534-433-3333' },
-    { nombre: 'Bustos & Asoc.',     email: 'bustos@rentar.com.ar',password_hash: hash('bustos123'),rol: 'inmobiliaria', empresa: 'Bustos & Asociados',  telefono: '03534-444-4444' },
-    { nombre: 'Usuario Demo',       email: 'user@rentar.com.ar',  password_hash: hash('user123'),  rol: 'usuario',      empresa: null,                  telefono: '03534-555-5555' },
-  ]).returning({ id: users.id });
+  const seeds = [
+    { nombre: 'Admin Demo',          email: 'admin@rentar.com.ar', password: 'admin123', rol: 'admin',        empresa: null,                  telefono: '03534-000000' },
+    { nombre: 'Inmobiliaria Centro', email: 'inmo@rentar.com.ar',  password: 'inmo123',  rol: 'inmobiliaria', empresa: 'Centro Propiedades',  telefono: '03534-411-1111' },
+    { nombre: 'Propiedades del Sur', email: 'sur@rentar.com.ar',   password: 'sur123',   rol: 'inmobiliaria', empresa: 'Propiedades del Sur', telefono: '03534-422-2222' },
+    { nombre: 'Inmobiliaria Vélez',  email: 'velez@rentar.com.ar', password: 'velez123', rol: 'inmobiliaria', empresa: 'Vélez Inmobiliaria',  telefono: '03534-433-3333' },
+    { nombre: 'Bustos & Asoc.',      email: 'bustos@rentar.com.ar', password: 'bustos123', rol: 'inmobiliaria', empresa: 'Bustos & Asociados', telefono: '03534-444-4444' },
+    { nombre: 'Usuario Demo',        email: 'user@rentar.com.ar',  password: 'user123',  rol: 'usuario',      empresa: null,                  telefono: '03534-555-5555' },
+  ];
+  const hashes = await Promise.all(seeds.map(s => bcrypt.hash(s.password, 10)));
+  const rows = await db.insert(users).values(
+    seeds.map((s, i) => ({
+      nombre:        s.nombre,
+      email:         s.email,
+      password_hash: hashes[i],
+      rol:           s.rol,
+      empresa:       s.empresa,
+      telefono:      s.telefono,
+    })),
+  ).returning({ id: users.id });
   console.log('[db] seed: usuarios creados');
   return { inmoId: rows[1].id, inmo2Id: rows[2].id, inmo3Id: rows[3].id, inmo4Id: rows[4].id };
 }

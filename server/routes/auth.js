@@ -1,39 +1,13 @@
 import { Router } from 'express';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { randomBytes } from 'node:crypto';
 import { eq, and, gt, ilike } from 'drizzle-orm';
-import rateLimit from 'express-rate-limit';
 import { db } from '../db/index.js';
 import { users, passwordResetTokens } from '../db/schema.js';
 import { authRequired, signToken } from '../middleware/auth.js';
 import { sendPasswordReset } from '../services/email.js';
 import { validate, registerSchema, loginSchema, forgotSchema, resetSchema } from '../middleware/validate.js';
-
-// Almacenamiento en memoria — aceptable para un solo servidor.
-// Al escalar a múltiples instancias, reemplazar con RedisStore.
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Demasiados intentos. Esperá 15 minutos e intentá de nuevo.' },
-});
-
-const registerLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Demasiados registros desde esta IP. Esperá 1 hora.' },
-});
-
-const forgotLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 3,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Demasiadas solicitudes. Esperá 1 hora e intentá de nuevo.' },
-});
+import { loginLimiter, registerLimiter, forgotLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
@@ -54,10 +28,11 @@ router.post('/register', registerLimiter, validate(registerSchema), wrap(async (
   const [exists] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
   if (exists) return res.status(409).json({ error: 'email ya registrado' });
 
+  const password_hash = await bcrypt.hash(password, 10);
   const [user] = await db.insert(users).values({
     nombre,
     email,
-    password_hash: bcrypt.hashSync(password, 10),
+    password_hash,
     rol,
     empresa:  empresa  || null,
     telefono: telefono || null,
@@ -71,7 +46,11 @@ router.post('/login', loginLimiter, validate(loginSchema), wrap(async (req, res)
   const email = req.body.email.toLowerCase().trim();
 
   const [row] = await db.select().from(users).where(eq(users.email, email));
-  if (!row || !bcrypt.compareSync(password, row.password_hash)) {
+  // compare contra un hash dummy si el usuario no existe, para que el tiempo
+  // de respuesta sea similar entre email válido e inválido (mitiga timing leaks).
+  const hash = row?.password_hash ?? '$2b$10$invalidhashinvalidhashinvalidhashinvalidhashinvalidhash';
+  const valid = await bcrypt.compare(password, hash);
+  if (!row || !valid) {
     return res.status(401).json({ error: 'credenciales invalidas' });
   }
 
@@ -138,10 +117,10 @@ router.post('/reset-password', validate(resetSchema), wrap(async (req, res) => {
 
   if (!record) return res.status(400).json({ error: 'El link expiró o ya fue utilizado.' });
 
-  // Actualiza contraseña e invalida el token
+  const password_hash = await bcrypt.hash(password, 10);
   await Promise.all([
     db.update(users)
-      .set({ password_hash: bcrypt.hashSync(password, 10) })
+      .set({ password_hash })
       .where(eq(users.id, record.user_id)),
     db.update(passwordResetTokens)
       .set({ used: true })

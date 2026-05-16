@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { MapPin, BedDouble, Bath, Maximize, Sparkles, Heart } from 'lucide-react';
 import { formatPrice, tipoLabel } from '../api.js';
+import { calcularDescuento } from '../utils/property.js';
 
 const TIPO_COLORS = {
   departamento: 'bg-brand text-white',
@@ -17,9 +18,7 @@ const TIPO_COLORS = {
 
 export default function PropertyCard({ property }) {
   const p = property;
-  const descuento = p.precio_anterior && p.precio_anterior > p.precio
-    ? Math.round(((p.precio_anterior - p.precio) / p.precio_anterior) * 100)
-    : 0;
+  const descuento = calcularDescuento(p);
 
   const tags = [];
   if (p.garantia === 'sin')      tags.push({ t: 'Sin garantía',    c: 'bg-success-soft text-success border-success-border dark:bg-success/10 dark:text-success dark:border-success/25' });

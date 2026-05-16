@@ -3,6 +3,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import { config } from '../config.js';
 import authRoutes from '../routes/auth.js';
 import propertiesRoutes from '../routes/properties.js';
@@ -13,6 +14,7 @@ import { pool } from '../db/index.js';
 export const app = express();
 app.set('trust proxy', config.trustProxy);
 app.use(helmet());
+app.use(compression());
 app.use(cors());
 app.use(express.json());
 

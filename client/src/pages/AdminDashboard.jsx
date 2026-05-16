@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Shield, Users, Trash2, Building2, Home, Crown } from 'lucide-react';
+import { Shield, Users, Trash2, Building2, Home, Crown, X } from 'lucide-react';
+import ConfirmModal from '../components/ConfirmModal.jsx';
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // user object o null
+  const [actionError, setActionError] = useState('');
 
   function load() {
     api.get('/admin/users').then(r => setUsers(r.data.users ?? [])).catch(console.error);
@@ -13,16 +16,25 @@ export default function AdminDashboard() {
   useEffect(() => { load(); }, []);
 
   async function changeRol(id, rol) {
-    await api.put(`/admin/users/${id}/rol`, { rol });
-    load();
-  }
-  async function delUser(id) {
-    if (!confirm('¿Eliminar este usuario y todas sus propiedades?')) return;
+    setActionError('');
     try {
-      await api.delete(`/admin/users/${id}`);
+      await api.put(`/admin/users/${id}/rol`, { rol });
       load();
     } catch (e) {
-      alert(e.response?.data?.error || 'Error');
+      setActionError(e.response?.data?.error || 'No se pudo cambiar el rol.');
+      load(); // recarga para revertir el <select> al valor real
+    }
+  }
+
+  async function delUser(user) {
+    setActionError('');
+    try {
+      await api.delete(`/admin/users/${user.id}`);
+      setConfirmDelete(null);
+      load();
+    } catch (e) {
+      setConfirmDelete(null);
+      setActionError(e.response?.data?.error || 'No se pudo eliminar el usuario.');
     }
   }
 
@@ -41,6 +53,15 @@ export default function AdminDashboard() {
           <p className="text-sm text-ink-400 dark:text-night-dim">Gestioná usuarios y monitoreá el portal</p>
         </div>
       </div>
+
+      {actionError && (
+        <div className="mb-5 flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-xl px-4 py-3">
+          <div className="flex-1 text-sm text-red-700 dark:text-red-400">{actionError}</div>
+          <button onClick={() => setActionError('')} className="text-red-400 hover:text-red-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-7">
         <Stat icon={<Home className="w-5 h-5" />}     label="Propiedades"     value={stats?.propiedades ?? '—'} color="bg-brand" />
@@ -87,7 +108,7 @@ export default function AdminDashboard() {
                   </td>
                   <td className="px-5 py-3 text-right">
                     <button
-                      onClick={() => delUser(u.id)}
+                      onClick={() => setConfirmDelete(u)}
                       className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-2.5 py-1.5 rounded-lg transition"
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Eliminar
@@ -99,6 +120,16 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Eliminar a ${confirmDelete.nombre}`}
+          message={`Esta acción no se puede deshacer. También se eliminarán sus ${confirmDelete.propiedades} propiedad${confirmDelete.propiedades !== 1 ? 'es' : ''}.`}
+          confirmLabel="Eliminar"
+          onConfirm={() => delUser(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
     </div>
   );
 }

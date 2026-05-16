@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, formatPrice, tipoLabel } from '../api.js';
+import { calcularDescuento } from '../utils/property.js';
 import { ArrowLeft, MapPin, BedDouble, Bath, Maximize, Phone, Mail, Building2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function PropertyDetail() {
@@ -26,8 +27,7 @@ export default function PropertyDetail() {
     </div>
   );
 
-  const desc = p.precio_anterior && p.precio_anterior > p.precio
-    ? Math.round(((p.precio_anterior - p.precio) / p.precio_anterior) * 100) : 0;
+  const desc = calcularDescuento(p);
 
   const photos = p.images?.length > 0
     ? p.images.map(i => i.url)

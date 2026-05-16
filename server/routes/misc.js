@@ -3,6 +3,7 @@ import { eq, desc, sql } from 'drizzle-orm';
 import { db, pool } from '../db/index.js';
 import { banners, profesionales, properties, users, ciudades } from '../db/schema.js';
 import { authRequired, requireRole } from '../middleware/auth.js';
+import { cacheControl } from '../middleware/cache.js';
 
 const router = Router();
 const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
@@ -26,7 +27,7 @@ async function countAdmins() {
 
 // ── Barrios ──────────────────────────────────────────────────────────────────
 // Raw SQL: JOIN con COUNT agregado
-router.get('/barrios', wrap(async (_req, res) => {
+router.get('/barrios', cacheControl({ maxAge: 60, staleWhileRevalidate: 300 }), wrap(async (_req, res) => {
   const { rows } = await pool.query(`
     SELECT b.*, COUNT(p.id)::int AS cantidad
     FROM barrios b
@@ -38,7 +39,7 @@ router.get('/barrios', wrap(async (_req, res) => {
 }));
 
 // Raw SQL: múltiples agregados (AVG, MIN, MAX, COALESCE) + cálculo de delta %
-router.get('/barrios/heatmap', wrap(async (_req, res) => {
+router.get('/barrios/heatmap', cacheControl({ maxAge: 300, staleWhileRevalidate: 600 }), wrap(async (_req, res) => {
   const { rows } = await pool.query(`
     SELECT
       b.id,
@@ -76,7 +77,7 @@ router.get('/barrios/heatmap', wrap(async (_req, res) => {
 }));
 
 // ── Banners ───────────────────────────────────────────────────────────────────
-router.get('/banners', wrap(async (_req, res) => {
+router.get('/banners', cacheControl({ maxAge: 600 }), wrap(async (_req, res) => {
   const rows = await db
     .select()
     .from(banners)
@@ -86,7 +87,7 @@ router.get('/banners', wrap(async (_req, res) => {
 }));
 
 // ── Profesionales ─────────────────────────────────────────────────────────────
-router.get('/profesionales', wrap(async (_req, res) => {
+router.get('/profesionales', cacheControl({ maxAge: 600 }), wrap(async (_req, res) => {
   const rows = await db
     .select()
     .from(profesionales)

@@ -38,22 +38,44 @@ export const resetSchema = z.object({
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.').max(128),
 });
 
-export const propertySchema = z.object({
+// Reglas reutilizables — el schema de creación las aplica con defaults
+// (request completo), el de update las usa con .optional() (PATCH parcial).
+const propertyFields = {
   titulo:            z.string().min(5, 'El título debe tener al menos 5 caracteres.').max(200),
   tipo:              z.string().min(1, 'Seleccioná un tipo de propiedad.'),
   direccion:         z.string().min(3, 'Ingresá una dirección válida.').max(200),
   barrio:            z.string().min(1, 'Seleccioná un barrio.'),
   precio:            z.coerce.number().int().positive('El precio debe ser mayor a cero.'),
-  precio_anterior:   z.coerce.number().int().positive().nullable().optional(),
-  ambientes:         z.coerce.number().int().min(1).max(20).default(1),
-  banos:             z.coerce.number().int().min(0).max(20).default(1),
-  superficie:        z.coerce.number().int().min(0).default(0),
-  garantia:          z.enum(['requerida', 'sin', 'ambas']).default('requerida'),
-  mascotas:          z.boolean().default(false),
-  amoblado:          z.boolean().default(false),
-  expensas_incluidas: z.boolean().default(false),
-  destacado:         z.boolean().default(false),
-  liquidacion:       z.boolean().default(false),
-  descripcion:       z.string().max(2000).optional().nullable(),
-  imagen:            z.string().url('URL de imagen inválida.').optional().nullable().or(z.literal('')),
+  precio_anterior:   z.coerce.number().int().positive().nullable(),
+  ambientes:         z.coerce.number().int().min(1).max(20),
+  banos:             z.coerce.number().int().min(0).max(20),
+  superficie:        z.coerce.number().int().min(0),
+  garantia:          z.enum(['requerida', 'sin', 'ambas']),
+  mascotas:          z.boolean(),
+  amoblado:          z.boolean(),
+  expensas_incluidas: z.boolean(),
+  destacado:         z.boolean(),
+  liquidacion:       z.boolean(),
+  descripcion:       z.string().max(2000).nullable(),
+  imagen:            z.string().url('URL de imagen inválida.').nullable().or(z.literal('')),
+};
+
+export const propertySchema = z.object({
+  ...propertyFields,
+  precio_anterior:   propertyFields.precio_anterior.optional(),
+  ambientes:         propertyFields.ambientes.default(1),
+  banos:             propertyFields.banos.default(1),
+  superficie:        propertyFields.superficie.default(0),
+  garantia:          propertyFields.garantia.default('requerida'),
+  mascotas:          propertyFields.mascotas.default(false),
+  amoblado:          propertyFields.amoblado.default(false),
+  expensas_incluidas: propertyFields.expensas_incluidas.default(false),
+  destacado:         propertyFields.destacado.default(false),
+  liquidacion:       propertyFields.liquidacion.default(false),
+  descripcion:       propertyFields.descripcion.optional(),
+  imagen:            propertyFields.imagen.optional(),
 });
+
+// Para PATCH/PUT parcial: todos los campos opcionales, sin defaults.
+// Lo que no viene no se toca — la semántica correcta de un update.
+export const propertyUpdateSchema = z.object(propertyFields).partial();

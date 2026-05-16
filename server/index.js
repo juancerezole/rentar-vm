@@ -2,6 +2,7 @@ import { config } from './config.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -23,6 +24,7 @@ const app = express();
 app.set('trust proxy', config.trustProxy);
 
 app.use(helmet());
+app.use(compression());
 app.use(cors({ origin: config.clientOrigin }));
 app.use(express.json({ limit: '2mb' }));
 
@@ -46,20 +48,6 @@ async function main() {
   logger.info('aplicando migraciones...');
   await migrate(db, { migrationsFolder: path.join(__dirname, 'db/migrations') });
   logger.info('migraciones OK');
-
-  // Garantiza property_images aunque la migración haya fallado silenciosamente
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS "property_images" (
-      "id" serial PRIMARY KEY NOT NULL,
-      "property_id" integer NOT NULL REFERENCES "properties"("id") ON DELETE CASCADE,
-      "url" text NOT NULL,
-      "public_id" text NOT NULL,
-      "orden" integer DEFAULT 0 NOT NULL,
-      "created_at" timestamp DEFAULT now()
-    )
-  `);
-  await pool.query(`CREATE INDEX IF NOT EXISTS "idx_property_images_property_id" ON "property_images" ("property_id")`);
-  logger.info('[db] property_images OK');
 
   await initDb();
 

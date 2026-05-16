@@ -3,7 +3,8 @@ import { eq, and, gte, lte, ilike, or, desc, asc, getTableColumns, sql } from 'd
 import { db, pool } from '../db/index.js';
 import { properties as propsTable, users, ciudades, propertyImages } from '../db/schema.js';
 import { authRequired, requireRole } from '../middleware/auth.js';
-import { validate, propertySchema } from '../middleware/validate.js';
+import { validate, propertySchema, propertyUpdateSchema } from '../middleware/validate.js';
+import { aiSearchLimiter, writeLimiter } from '../middleware/rateLimit.js';
 import { deleteCloudinaryImage } from '../services/cloudinary.js';
 import logger from '../logger.js';
 
@@ -93,7 +94,7 @@ router.get('/', wrap(async (req, res) => {
 // ── POST /ai-search — búsqueda en lenguaje natural (Raw SQL + pg pool) ────────
 // Usa raw SQL porque construye condiciones compuestas dinámicamente que no se
 // expresan limpiamente con el builder de Drizzle (ej: monoambiente = tipo + ambientes).
-router.post('/ai-search', wrap(async (req, res) => {
+router.post('/ai-search', aiSearchLimiter, wrap(async (req, res) => {
   const text = String(req.body?.text || '').toLowerCase();
   if (!text.trim()) return res.json({ properties: [], interpretation: null });
 
@@ -216,7 +217,7 @@ router.get('/:id', wrap(async (req, res) => {
 }));
 
 // ── POST /:id/images — registra URL de Cloudinary ya subida ──────────────────
-router.post('/:id/images', authRequired, wrap(async (req, res) => {
+router.post('/:id/images', writeLimiter, authRequired, wrap(async (req, res) => {
   const id = parseId(req.params.id);
   if (!id) return res.status(400).json({ error: 'id inválido' });
 
@@ -246,7 +247,7 @@ router.post('/:id/images', authRequired, wrap(async (req, res) => {
 }));
 
 // ── DELETE /:id/images/:imageId — elimina imagen de DB y Cloudinary ──────────
-router.delete('/:id/images/:imageId', authRequired, wrap(async (req, res) => {
+router.delete('/:id/images/:imageId', writeLimiter, authRequired, wrap(async (req, res) => {
   const id      = parseId(req.params.id);
   const imageId = parseId(req.params.imageId);
   if (!id || !imageId) return res.status(400).json({ error: 'id inválido' });
@@ -278,7 +279,7 @@ router.delete('/:id/images/:imageId', authRequired, wrap(async (req, res) => {
 }));
 
 // ── POST / — crear propiedad (Drizzle ORM) ────────────────────────────────────
-router.post('/', authRequired, requireRole('inmobiliaria', 'admin'), validate(propertySchema), wrap(async (req, res) => {
+router.post('/', writeLimiter, authRequired, requireRole('inmobiliaria', 'admin'), validate(propertySchema), wrap(async (req, res) => {
   const b = req.body;
   const ciudadId = await getDefaultCiudadId();
 
@@ -308,42 +309,32 @@ router.post('/', authRequired, requireRole('inmobiliaria', 'admin'), validate(pr
 }));
 
 // ── PUT /:id — editar propiedad (Drizzle ORM) ─────────────────────────────────
-router.put('/:id', authRequired, wrap(async (req, res) => {
+// Valida con propertyUpdateSchema (todos los campos opcionales). Sólo se
+// actualizan los campos presentes en el body — Drizzle hace el merge en SQL.
+router.put('/:id', writeLimiter, authRequired, validate(propertyUpdateSchema), wrap(async (req, res) => {
   const id = parseId(req.params.id);
   if (!id) return res.status(400).json({ error: 'id inválido' });
-  const [existing] = await db
-    .select()
-    .from(propsTable)
-    .where(eq(propsTable.id, id));
+
+  const [existing] = await db.select({ user_id: propsTable.user_id })
+    .from(propsTable).where(eq(propsTable.id, id));
   if (!existing) return res.status(404).json({ error: 'no encontrada' });
   if (existing.user_id !== req.user.id && req.user.rol !== 'admin') {
     return res.status(403).json({ error: 'sin permisos' });
   }
 
-  const b = req.body || {};
-  const merged = {
-    titulo:             b.titulo             ?? existing.titulo,
-    tipo:               b.tipo               ?? existing.tipo,
-    direccion:          b.direccion          ?? existing.direccion,
-    barrio:             b.barrio             ?? existing.barrio,
-    precio:             b.precio       != null ? Number(b.precio)      : existing.precio,
-    precio_anterior:    b.precio_anterior != null ? Number(b.precio_anterior) : existing.precio_anterior,
-    ambientes:          b.ambientes    != null ? Number(b.ambientes)   : existing.ambientes,
-    banos:              b.banos        != null ? Number(b.banos)       : existing.banos,
-    superficie:         b.superficie   != null ? Number(b.superficie)  : existing.superficie,
-    garantia:           b.garantia           ?? existing.garantia,
-    mascotas:           b.mascotas     != null ? !!b.mascotas          : existing.mascotas,
-    amoblado:           b.amoblado     != null ? !!b.amoblado          : existing.amoblado,
-    expensas_incluidas: b.expensas_incluidas != null ? !!b.expensas_incluidas : existing.expensas_incluidas,
-    destacado:          req.user.rol === 'admin' && b.destacado != null ? !!b.destacado : existing.destacado,
-    liquidacion:        b.liquidacion  != null ? !!b.liquidacion       : existing.liquidacion,
-    descripcion:        b.descripcion        ?? existing.descripcion,
-    imagen:             b.imagen             ?? existing.imagen,
-  };
+  const updates = { ...req.body };
+  // destacado es admin-only — silenciosamente se descarta si lo manda
+  // una inmobiliaria. No es un error: simplemente no aplica.
+  if (req.user.rol !== 'admin') delete updates.destacado;
+
+  if (Object.keys(updates).length === 0) {
+    const [row] = await db.select().from(propsTable).where(eq(propsTable.id, id));
+    return res.json({ property: row });
+  }
 
   const [row] = await db
     .update(propsTable)
-    .set(merged)
+    .set(updates)
     .where(eq(propsTable.id, id))
     .returning();
 
@@ -351,7 +342,7 @@ router.put('/:id', authRequired, wrap(async (req, res) => {
 }));
 
 // ── DELETE /:id (Drizzle ORM) ─────────────────────────────────────────────────
-router.delete('/:id', authRequired, wrap(async (req, res) => {
+router.delete('/:id', writeLimiter, authRequired, wrap(async (req, res) => {
   const id = parseId(req.params.id);
   if (!id) return res.status(400).json({ error: 'id inválido' });
   const [existing] = await db
