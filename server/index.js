@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import { config } from './config.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -8,18 +8,22 @@ import path from 'node:path';
 import authRoutes from './routes/auth.js';
 import propertiesRoutes from './routes/properties.js';
 import miscRoutes from './routes/misc.js';
+import { errorHandler } from './middleware/error.js';
 import { db, pool } from './db/index.js';
 import { initDb } from './db/seed.js';
 import logger from './logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const app    = express();
-const PORT   = process.env.PORT   || 4000;
-const ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const app = express();
+
+// Detrás de un proxy (Render, Vercel, Cloudflare) Express necesita confiar
+// en X-Forwarded-* para que req.ip refleje al cliente real. Sin esto,
+// express-rate-limit cuenta todos los requests bajo la IP del balancer.
+app.set('trust proxy', config.trustProxy);
 
 app.use(helmet());
-app.use(cors({ origin: ORIGIN }));
+app.use(cors({ origin: config.clientOrigin }));
 app.use(express.json({ limit: '2mb' }));
 
 // Health check con ping real a la base de datos
@@ -36,10 +40,7 @@ app.use('/api/auth',       authRoutes);
 app.use('/api/properties', propertiesRoutes);
 app.use('/api',            miscRoutes);
 
-app.use((err, _req, res, _next) => {
-  logger.error(err, 'error interno');
-  res.status(500).json({ error: err.message || 'error interno' });
-});
+app.use(errorHandler);
 
 async function main() {
   logger.info('aplicando migraciones...');
@@ -62,8 +63,8 @@ async function main() {
 
   await initDb();
 
-  const server = app.listen(PORT, () =>
-    logger.info(`Rentar API escuchando en :${PORT}`)
+  const server = app.listen(config.port, () =>
+    logger.info(`Rentar API escuchando en :${config.port}`)
   );
 
   process.on('SIGTERM', async () => {

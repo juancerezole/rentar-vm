@@ -3,12 +3,15 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { config } from '../config.js';
 import authRoutes from '../routes/auth.js';
 import propertiesRoutes from '../routes/properties.js';
 import miscRoutes from '../routes/misc.js';
+import { errorHandler } from '../middleware/error.js';
 import { pool } from '../db/index.js';
 
 export const app = express();
+app.set('trust proxy', config.trustProxy);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
@@ -26,6 +29,4 @@ app.use('/api/auth',       authRoutes);
 app.use('/api/properties', propertiesRoutes);
 app.use('/api',            miscRoutes);
 
-app.use((err, _req, res, _next) => {
-  res.status(500).json({ error: err.message || 'error interno' });
-});
+app.use(errorHandler);

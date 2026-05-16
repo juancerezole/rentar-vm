@@ -1,17 +1,13 @@
-import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
+import { config } from '../config.js';
 import * as schema from './schema.js';
 
 const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL no está definida en .env');
-}
-
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 10,
+  connectionString: config.database.url,
+  max: config.database.poolMax,
 });
 
 export const db = drizzle(pool, { schema });

@@ -1,9 +1,12 @@
 import jwt from 'jsonwebtoken';
-
-const SECRET = process.env.JWT_SECRET || 'dev-secret';
+import { config } from '../config.js';
 
 export function signToken(user) {
-  return jwt.sign({ id: user.id, rol: user.rol, email: user.email }, SECRET, { expiresIn: '7d' });
+  return jwt.sign(
+    { id: user.id, rol: user.rol, email: user.email },
+    config.jwt.secret,
+    { expiresIn: config.jwt.expiresIn },
+  );
 }
 
 export function authRequired(req, res, next) {
@@ -11,7 +14,7 @@ export function authRequired(req, res, next) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'token requerido' });
   try {
-    req.user = jwt.verify(token, SECRET);
+    req.user = jwt.verify(token, config.jwt.secret);
     next();
   } catch {
     return res.status(401).json({ error: 'token invalido' });
@@ -30,7 +33,7 @@ export function optionalAuth(req, _res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (token) {
-    try { req.user = jwt.verify(token, SECRET); } catch { /* ignore */ }
+    try { req.user = jwt.verify(token, config.jwt.secret); } catch { /* ignore */ }
   }
   next();
 }

@@ -7,6 +7,23 @@ import { authRequired, requireRole } from '../middleware/auth.js';
 const router = Router();
 const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
 
+const VALID_ROLES = ['admin', 'inmobiliaria', 'usuario'];
+
+function parseId(param) {
+  const n = Number(param);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+// Devuelve la cantidad de admins en el sistema — usado para evitar que el
+// último admin pierda privilegios o sea eliminado.
+async function countAdmins() {
+  const [{ count }] = await db
+    .select({ count: sql`count(*)::int` })
+    .from(users)
+    .where(eq(users.rol, 'admin'));
+  return count;
+}
+
 // ── Barrios ──────────────────────────────────────────────────────────────────
 // Raw SQL: JOIN con COUNT agregado
 router.get('/barrios', wrap(async (_req, res) => {
@@ -59,7 +76,6 @@ router.get('/barrios/heatmap', wrap(async (_req, res) => {
 }));
 
 // ── Banners ───────────────────────────────────────────────────────────────────
-// Drizzle ORM: simple select con filtro
 router.get('/banners', wrap(async (_req, res) => {
   const rows = await db
     .select()
@@ -70,7 +86,6 @@ router.get('/banners', wrap(async (_req, res) => {
 }));
 
 // ── Profesionales ─────────────────────────────────────────────────────────────
-// Drizzle ORM: simple select con order
 router.get('/profesionales', wrap(async (_req, res) => {
   const rows = await db
     .select()
@@ -80,7 +95,6 @@ router.get('/profesionales', wrap(async (_req, res) => {
 }));
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
-// Drizzle ORM: tres counts en paralelo
 router.get('/stats/summary', wrap(async (_req, res) => {
   const [[{ total }], [{ liquidaciones }], [{ inmobiliarias }]] = await Promise.all([
     db.select({ total:        sql`count(*)::int` }).from(properties),
@@ -98,7 +112,6 @@ router.get('/stats/summary', wrap(async (_req, res) => {
 }));
 
 // ── Admin: usuarios ───────────────────────────────────────────────────────────
-// Raw SQL: JOIN con subquery de conteo de propiedades por usuario
 router.get('/admin/users', authRequired, requireRole('admin'), wrap(async (_req, res) => {
   const { rows } = await pool.query(`
     SELECT
@@ -112,22 +125,53 @@ router.get('/admin/users', authRequired, requireRole('admin'), wrap(async (_req,
   res.json({ users: rows });
 }));
 
-// Drizzle ORM: update simple de un campo
+// Cambiar rol de un usuario. Reglas:
+//   1. No podés modificar tu propio rol (evita auto-degradación accidental
+//      y evita que un admin se "promueva" desde una cuenta comprometida).
+//   2. No se puede degradar al último admin — el sistema quedaría sin
+//      forma de recuperar privilegios.
 router.put('/admin/users/:id/rol', authRequired, requireRole('admin'), wrap(async (req, res) => {
+  const targetId = parseId(req.params.id);
+  if (!targetId) return res.status(400).json({ error: 'id invalido' });
+
   const { rol } = req.body || {};
-  if (!['admin', 'inmobiliaria', 'usuario'].includes(rol)) {
+  if (!VALID_ROLES.includes(rol)) {
     return res.status(400).json({ error: 'rol invalido' });
   }
-  await db.update(users).set({ rol }).where(eq(users.id, Number(req.params.id)));
+
+  if (targetId === req.user.id) {
+    return res.status(403).json({ error: 'no podés modificar tu propio rol' });
+  }
+
+  if (rol !== 'admin') {
+    const [target] = await db.select({ rol: users.rol }).from(users).where(eq(users.id, targetId));
+    if (!target) return res.status(404).json({ error: 'usuario no encontrado' });
+    if (target.rol === 'admin' && (await countAdmins()) <= 1) {
+      return res.status(409).json({ error: 'no se puede degradar al último admin' });
+    }
+  }
+
+  await db.update(users).set({ rol }).where(eq(users.id, targetId));
   res.json({ ok: true });
 }));
 
-// Drizzle ORM: delete simple
+// Eliminar usuario. Mismas protecciones que el cambio de rol.
 router.delete('/admin/users/:id', authRequired, requireRole('admin'), wrap(async (req, res) => {
-  if (Number(req.params.id) === req.user.id) {
-    return res.status(400).json({ error: 'no podes eliminarte a vos mismo' });
+  const targetId = parseId(req.params.id);
+  if (!targetId) return res.status(400).json({ error: 'id invalido' });
+
+  if (targetId === req.user.id) {
+    return res.status(403).json({ error: 'no podés eliminarte a vos mismo' });
   }
-  await db.delete(users).where(eq(users.id, Number(req.params.id)));
+
+  const [target] = await db.select({ rol: users.rol }).from(users).where(eq(users.id, targetId));
+  if (!target) return res.status(404).json({ error: 'usuario no encontrado' });
+
+  if (target.rol === 'admin' && (await countAdmins()) <= 1) {
+    return res.status(409).json({ error: 'no se puede eliminar al último admin' });
+  }
+
+  await db.delete(users).where(eq(users.id, targetId));
   res.json({ ok: true });
 }));
 

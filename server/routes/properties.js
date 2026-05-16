@@ -5,6 +5,7 @@ import { properties as propsTable, users, ciudades, propertyImages } from '../db
 import { authRequired, requireRole } from '../middleware/auth.js';
 import { validate, propertySchema } from '../middleware/validate.js';
 import { deleteCloudinaryImage } from '../services/cloudinary.js';
+import logger from '../logger.js';
 
 const router = Router();
 const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
@@ -260,7 +261,11 @@ router.delete('/:id/images/:imageId', authRequired, wrap(async (req, res) => {
   if (!img) return res.status(404).json({ error: 'imagen no encontrada' });
 
   await db.delete(propertyImages).where(eq(propertyImages.id, imageId));
-  deleteCloudinaryImage(img.public_id).catch(() => {});
+  // Fire-and-forget: si Cloudinary falla, la fila ya está borrada de la DB —
+  // loggeamos para poder reclamar la imagen huérfana después.
+  deleteCloudinaryImage(img.public_id).catch(err =>
+    logger.warn({ err, public_id: img.public_id, property_id: id }, 'cloudinary delete falló'),
+  );
 
   const [next] = await db.select({ url: propertyImages.url })
     .from(propertyImages)
@@ -360,7 +365,11 @@ router.delete('/:id', authRequired, wrap(async (req, res) => {
   const imgs = await db.select({ public_id: propertyImages.public_id })
     .from(propertyImages).where(eq(propertyImages.property_id, id));
   await db.delete(propsTable).where(eq(propsTable.id, id));
-  for (const img of imgs) deleteCloudinaryImage(img.public_id).catch(() => {});
+  for (const img of imgs) {
+    deleteCloudinaryImage(img.public_id).catch(err =>
+      logger.warn({ err, public_id: img.public_id, property_id: id }, 'cloudinary delete falló'),
+    );
+  }
   res.json({ ok: true });
 }));
 

@@ -1,19 +1,21 @@
 import { Resend } from 'resend';
+import { config } from '../config.js';
+import logger from '../logger.js';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const resend = config.email.resendApiKey ? new Resend(config.email.resendApiKey) : null;
 
 export async function sendPasswordReset(email, nombre, resetUrl) {
-  // Sin API key: log en consola para desarrollo local
+  // Sin API key: log en consola para desarrollo local.
   if (!resend) {
-    console.log(`\n[email DEV] Para: ${email}\n[email DEV] Link de reset: ${resetUrl}\n`);
+    logger.info({ to: email, resetUrl }, '[email DEV] password reset link');
     return;
   }
 
   await resend.emails.send({
-    from: 'Rentar <noreply@rentar.com.ar>',
-    to:   email,
+    from:    config.email.from,
+    to:      email,
     subject: 'Recuperá tu contraseña — Rentar',
-    html: buildResetEmail(nombre, resetUrl),
+    html:    buildResetEmail(nombre, resetUrl),
   });
 }
 
