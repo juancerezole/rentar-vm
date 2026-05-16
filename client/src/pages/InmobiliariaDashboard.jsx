@@ -1,47 +1,49 @@
 import { useEffect, useState } from 'react';
 import { api, formatPrice, tipoLabel, TIPOS } from '../api.js';
-import { Plus, Pencil, Trash2, X, Building2, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Building2, Image as ImageIcon, Sparkles, Camera } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
+import ImageUploader from '../components/ImageUploader.jsx';
 import { inputCls, Field } from '../components/ui/FormField.jsx';
 
 const EMPTY_FORM = {
   titulo: '', tipo: 'departamento', direccion: '', barrio: '',
   precio: '', precio_anterior: '', ambientes: 1, banos: 1, superficie: '',
   garantia: 'requerida', mascotas: false, amoblado: false, expensas_incluidas: false,
-  destacado: false, liquidacion: false, descripcion: '', imagen: '',
+  destacado: false, liquidacion: false, descripcion: '',
 };
-
-const SAMPLE_IMAGES = [
-  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800',
-  'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800',
-  'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800',
-  'https://images.unsplash.com/photo-1513584684374-8bab748fbf90?w=800',
-  'https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800',
-  'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800',
-];
 
 export default function InmobiliariaDashboard() {
   const { user } = useAuth();
-  const [list, setList] = useState([]);
-  const [barrios, setBarrios] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(null); // id a eliminar
-  const [formError, setFormError] = useState('');
+  const [list, setList]                 = useState([]);
+  const [barrios, setBarrios]           = useState([]);
+  const [open, setOpen]                 = useState(false);
+  const [step, setStep]                 = useState('form'); // 'form' | 'photos'
+  const [editingId, setEditingId]       = useState(null);
+  const [form, setForm]                 = useState(EMPTY_FORM);
+  const [saving, setSaving]             = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [formError, setFormError]       = useState('');
+  const [images, setImages]             = useState([]);
 
   function load() {
     api.get('/properties/mine/list').then(r => setList(r.data.properties ?? [])).catch(console.error);
   }
+
   useEffect(() => {
     load();
     api.get('/barrios').then(r => setBarrios(r.data.barrios ?? [])).catch(console.error);
   }, []);
 
-  function startCreate() { setEditingId(null); setForm(EMPTY_FORM); setOpen(true); }
-  function startEdit(p) {
+  function startCreate() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setImages([]);
+    setStep('form');
+    setOpen(true);
+  }
+
+  async function startEdit(p) {
     setEditingId(p.id);
     setForm({
       titulo: p.titulo, tipo: p.tipo, direccion: p.direccion, barrio: p.barrio,
@@ -50,9 +52,15 @@ export default function InmobiliariaDashboard() {
       garantia: p.garantia,
       mascotas: !!p.mascotas, amoblado: !!p.amoblado, expensas_incluidas: !!p.expensas_incluidas,
       destacado: !!p.destacado, liquidacion: !!p.liquidacion,
-      descripcion: p.descripcion || '', imagen: p.imagen || '',
+      descripcion: p.descripcion || '',
     });
+    setImages([]);
+    setStep('form');
     setOpen(true);
+    try {
+      const r = await api.get(`/properties/${p.id}`);
+      setImages(r.data.property.images ?? []);
+    } catch { /* ignore */ }
   }
 
   async function onSubmit(e) {
@@ -61,12 +69,27 @@ export default function InmobiliariaDashboard() {
     setSaving(true);
     try {
       const payload = { ...form, precio_anterior: form.precio_anterior || null };
-      if (editingId) await api.put(`/properties/${editingId}`, payload);
-      else await api.post('/properties', payload);
-      setOpen(false); load();
+      if (editingId) {
+        await api.put(`/properties/${editingId}`, payload);
+        setStep('photos');
+      } else {
+        const r = await api.post('/properties', payload);
+        setEditingId(r.data.property.id);
+        setStep('photos');
+      }
+      load();
     } catch (err) {
       setFormError(err.response?.data?.error || 'Error al guardar');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function closeModal() {
+    setOpen(false);
+    setStep('form');
+    setEditingId(null);
+    setImages([]);
   }
 
   async function onDelete(id) {
@@ -150,132 +173,148 @@ export default function InmobiliariaDashboard() {
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-start md:items-center justify-center p-4 bg-ink-900/50 dark:bg-black/70 backdrop-blur-sm"
-          onClick={() => setOpen(false)}
+          onClick={closeModal}
         >
           <div
             onClick={e => e.stopPropagation()}
             className="bg-white dark:bg-night-card rounded-2xl shadow-lg dark:shadow-dark-card max-w-3xl w-full max-h-[92vh] overflow-y-auto scrollbar-thin animate-fadeIn"
           >
             <div className="sticky top-0 bg-white dark:bg-night-card border-b border-ink-100 dark:border-night-border px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-ink-900 dark:text-night-text">
-                {editingId ? 'Editar propiedad' : 'Nueva propiedad'}
-              </h2>
-              <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-ink-100 dark:hover:bg-night-elevated transition">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-bold text-ink-900 dark:text-night-text">
+                  {editingId ? 'Editar propiedad' : 'Nueva propiedad'}
+                </h2>
+                <div className="flex items-center gap-1">
+                  <StepDot active={step === 'form'} done={step === 'photos'} label="Datos" />
+                  <div className="w-6 h-px bg-ink-200 dark:bg-night-border" />
+                  <StepDot active={step === 'photos'} done={false} label="Fotos" />
+                </div>
+              </div>
+              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-ink-100 dark:hover:bg-night-elevated transition">
                 <X className="w-5 h-5 text-ink-500 dark:text-night-muted" />
               </button>
             </div>
 
-            <form onSubmit={onSubmit} className="p-6 space-y-5">
-              <Field label="Título de la publicación *">
-                <input value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })} required placeholder="Ej: Depto luminoso 2 amb. en pleno centro" className={inputCls} />
-              </Field>
+            {step === 'form' ? (
+              <form onSubmit={onSubmit} className="p-6 space-y-5">
+                <Field label="Título de la publicación *">
+                  <input value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })} required placeholder="Ej: Depto luminoso 2 amb. en pleno centro" className={inputCls} />
+                </Field>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Tipo de propiedad *">
-                  <select value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })} className={inputCls}>
-                    {TIPOS.map(t => <option key={t.v} value={t.v}>{t.label}</option>)}
-                  </select>
-                </Field>
-                <Field label="Barrio *">
-                  <select value={form.barrio} onChange={e => setForm({ ...form, barrio: e.target.value })} required className={inputCls}>
-                    <option value="">Elegí un barrio</option>
-                    {barrios.map(b => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}
-                  </select>
-                </Field>
-              </div>
-
-              <Field label="Dirección *">
-                <input value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })} required placeholder="Ej: Av. Sabattini 1234" className={inputCls} />
-              </Field>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Precio mensual *">
-                  <input type="number" min="0" value={form.precio} onChange={e => setForm({ ...form, precio: e.target.value })} required placeholder="$" className={inputCls} />
-                </Field>
-                <Field label="Precio anterior (si está en liquidación)">
-                  <input type="number" min="0" value={form.precio_anterior} onChange={e => setForm({ ...form, precio_anterior: e.target.value })} placeholder="$ (opcional)" className={inputCls} />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <Field label="Ambientes">
-                  <input type="number" min="1" value={form.ambientes} onChange={e => setForm({ ...form, ambientes: e.target.value })} className={inputCls} />
-                </Field>
-                <Field label="Baños">
-                  <input type="number" min="0" value={form.banos} onChange={e => setForm({ ...form, banos: e.target.value })} className={inputCls} />
-                </Field>
-                <Field label="Superficie (m²)">
-                  <input type="number" min="0" value={form.superficie} onChange={e => setForm({ ...form, superficie: e.target.value })} className={inputCls} />
-                </Field>
-              </div>
-
-              <Field label="Garantía">
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { v: 'requerida', l: 'Requerida' },
-                    { v: 'sin', l: 'Sin garantía' },
-                    { v: 'ambas', l: 'Ambas opciones' },
-                  ].map(g => (
-                    <button key={g.v} type="button" onClick={() => setForm({ ...form, garantia: g.v })}
-                      className={`py-2 rounded-xl text-sm font-medium border transition ${
-                        form.garantia === g.v
-                          ? 'bg-brand-soft dark:bg-accent-orange/10 border-brand-mid dark:border-accent-orange text-brand dark:text-accent-orange'
-                          : 'border-ink-200 dark:border-night-border text-ink-600 dark:text-night-muted hover:bg-ink-100/50 dark:hover:bg-night-elevated'
-                      }`}>
-                      {g.l}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Tipo de propiedad *">
+                    <select value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })} className={inputCls}>
+                      {TIPOS.map(t => <option key={t.v} value={t.v}>{t.label}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Barrio *">
+                    <select value={form.barrio} onChange={e => setForm({ ...form, barrio: e.target.value })} required className={inputCls}>
+                      <option value="">Elegí un barrio</option>
+                      {barrios.map(b => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}
+                    </select>
+                  </Field>
                 </div>
-              </Field>
 
-              <div className="grid grid-cols-2 gap-2">
-                <Check label="Acepta mascotas"    checked={form.mascotas}           onChange={v => setForm({ ...form, mascotas: v })} />
-                <Check label="Amoblado"            checked={form.amoblado}           onChange={v => setForm({ ...form, amoblado: v })} />
-                <Check label="Expensas incluidas"  checked={form.expensas_incluidas} onChange={v => setForm({ ...form, expensas_incluidas: v })} />
-                <Check label="En liquidación"      checked={form.liquidacion}        onChange={v => setForm({ ...form, liquidacion: v })} />
-                {user?.rol === 'admin' && (
-                  <Check label="Destacar (admin)"  checked={form.destacado}          onChange={v => setForm({ ...form, destacado: v })} />
+                <Field label="Dirección *">
+                  <input value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })} required placeholder="Ej: Av. Sabattini 1234" className={inputCls} />
+                </Field>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Precio mensual *">
+                    <input type="number" min="0" value={form.precio} onChange={e => setForm({ ...form, precio: e.target.value })} required placeholder="$" className={inputCls} />
+                  </Field>
+                  <Field label="Precio anterior (si está en liquidación)">
+                    <input type="number" min="0" value={form.precio_anterior} onChange={e => setForm({ ...form, precio_anterior: e.target.value })} placeholder="$ (opcional)" className={inputCls} />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="Ambientes">
+                    <input type="number" min="1" value={form.ambientes} onChange={e => setForm({ ...form, ambientes: e.target.value })} className={inputCls} />
+                  </Field>
+                  <Field label="Baños">
+                    <input type="number" min="0" value={form.banos} onChange={e => setForm({ ...form, banos: e.target.value })} className={inputCls} />
+                  </Field>
+                  <Field label="Superficie (m²)">
+                    <input type="number" min="0" value={form.superficie} onChange={e => setForm({ ...form, superficie: e.target.value })} className={inputCls} />
+                  </Field>
+                </div>
+
+                <Field label="Garantía">
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { v: 'requerida', l: 'Requerida' },
+                      { v: 'sin', l: 'Sin garantía' },
+                      { v: 'ambas', l: 'Ambas opciones' },
+                    ].map(g => (
+                      <button key={g.v} type="button" onClick={() => setForm({ ...form, garantia: g.v })}
+                        className={`py-2 rounded-xl text-sm font-medium border transition ${
+                          form.garantia === g.v
+                            ? 'bg-brand-soft dark:bg-accent-orange/10 border-brand-mid dark:border-accent-orange text-brand dark:text-accent-orange'
+                            : 'border-ink-200 dark:border-night-border text-ink-600 dark:text-night-muted hover:bg-ink-100/50 dark:hover:bg-night-elevated'
+                        }`}>
+                        {g.l}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Check label="Acepta mascotas"    checked={form.mascotas}           onChange={v => setForm({ ...form, mascotas: v })} />
+                  <Check label="Amoblado"            checked={form.amoblado}           onChange={v => setForm({ ...form, amoblado: v })} />
+                  <Check label="Expensas incluidas"  checked={form.expensas_incluidas} onChange={v => setForm({ ...form, expensas_incluidas: v })} />
+                  <Check label="En liquidación"      checked={form.liquidacion}        onChange={v => setForm({ ...form, liquidacion: v })} />
+                  {user?.rol === 'admin' && (
+                    <Check label="Destacar (admin)"  checked={form.destacado}          onChange={v => setForm({ ...form, destacado: v })} />
+                  )}
+                </div>
+
+                <Field label="Descripción">
+                  <textarea rows={3} value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} className={inputCls} placeholder="Detalles, comodidades, ubicación..." />
+                </Field>
+
+                {formError && (
+                  <div className="text-sm text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-xl px-3 py-2.5">
+                    {formError}
+                  </div>
                 )}
-              </div>
 
-              <Field label="Descripción">
-                <textarea rows={3} value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} className={inputCls} placeholder="Detalles, comodidades, ubicación..." />
-              </Field>
-
-              <Field label="URL de imagen principal">
-                <input value={form.imagen} onChange={e => setForm({ ...form, imagen: e.target.value })} placeholder="https://..." className={inputCls} />
-                <div className="flex gap-2 mt-2 overflow-x-auto scrollbar-thin pb-1">
-                  {SAMPLE_IMAGES.map(src => (
-                    <button key={src} type="button" onClick={() => setForm({ ...form, imagen: src })}
-                      className={`w-20 h-14 shrink-0 rounded-xl overflow-hidden border-2 transition ${
-                        form.imagen === src
-                          ? 'border-brand-mid dark:border-accent-orange shadow-soft'
-                          : 'border-transparent hover:border-ink-300 dark:hover:border-night-border'
-                      }`}>
-                      <img src={src} alt="" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+                <div className="flex gap-2 pt-4 border-t border-ink-100 dark:border-night-border">
+                  <button type="button" onClick={closeModal}
+                    className="flex-1 py-2.5 rounded-xl border border-ink-200 dark:border-night-border font-semibold text-ink-600 dark:text-night-muted hover:bg-ink-100 dark:hover:bg-night-elevated transition">
+                    Cancelar
+                  </button>
+                  <button disabled={saving}
+                    className="flex-1 py-2.5 rounded-xl bg-brand dark:bg-accent-orange hover:bg-brand-dark dark:hover:bg-accent-orange/90 disabled:opacity-60 text-white font-semibold transition shadow-soft">
+                    {saving ? 'Guardando...' : 'Siguiente: agregar fotos →'}
+                  </button>
                 </div>
-                <p className="text-[11px] text-ink-400 dark:text-night-dim mt-1">Tip: elegí una imagen de muestra o pegá una URL.</p>
-              </Field>
-
-              {formError && (
-                <div className="text-sm text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-xl px-3 py-2.5">
-                  {formError}
+              </form>
+            ) : (
+              <div className="p-6 space-y-5">
+                <div className="flex items-center gap-2 text-ink-600 dark:text-night-muted">
+                  <Camera className="w-5 h-5 text-brand-mid dark:text-accent-orange" />
+                  <span className="text-sm font-medium">Agregá hasta 10 fotos de la propiedad. La primera es la portada.</span>
                 </div>
-              )}
 
-              <div className="flex gap-2 pt-4 border-t border-ink-100 dark:border-night-border">
-                <button type="button" onClick={() => setOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-ink-200 dark:border-night-border font-semibold text-ink-600 dark:text-night-muted hover:bg-ink-100 dark:hover:bg-night-elevated transition">
-                  Cancelar
-                </button>
-                <button disabled={saving}
-                  className="flex-1 py-2.5 rounded-xl bg-brand dark:bg-accent-orange hover:bg-brand-dark dark:hover:bg-accent-orange/90 disabled:opacity-60 text-white font-semibold transition shadow-soft">
-                  {saving ? 'Guardando...' : (editingId ? 'Guardar cambios' : 'Publicar propiedad')}
-                </button>
+                <ImageUploader
+                  propertyId={editingId}
+                  images={images}
+                  onImagesChange={setImages}
+                />
+
+                <div className="flex gap-2 pt-4 border-t border-ink-100 dark:border-night-border">
+                  <button type="button" onClick={() => setStep('form')}
+                    className="py-2.5 px-4 rounded-xl border border-ink-200 dark:border-night-border font-semibold text-ink-600 dark:text-night-muted hover:bg-ink-100 dark:hover:bg-night-elevated transition text-sm">
+                    ← Volver a datos
+                  </button>
+                  <button type="button" onClick={closeModal}
+                    className="flex-1 py-2.5 rounded-xl bg-brand dark:bg-accent-orange hover:bg-brand-dark dark:hover:bg-accent-orange/90 text-white font-semibold transition shadow-soft">
+                    {images.length > 0 ? `Listo · ${images.length} foto${images.length !== 1 ? 's' : ''}` : 'Listo sin fotos'}
+                  </button>
+                </div>
               </div>
-            </form>
+            )}
           </div>
         </div>
       )}
@@ -283,6 +322,22 @@ export default function InmobiliariaDashboard() {
   );
 }
 
+function StepDot({ active, done, label }) {
+  return (
+    <div className="flex items-center gap-1">
+      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition ${
+        active ? 'bg-brand dark:bg-accent-orange text-white' :
+        done   ? 'bg-success text-white' :
+                 'bg-ink-100 dark:bg-night-border text-ink-400 dark:text-night-muted'
+      }`}>
+        {done ? '✓' : ''}
+      </div>
+      <span className={`text-xs font-medium ${active ? 'text-ink-900 dark:text-night-text' : 'text-ink-400 dark:text-night-muted'}`}>
+        {label}
+      </span>
+    </div>
+  );
+}
 
 function Check({ label, checked, onChange }) {
   return (

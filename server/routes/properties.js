@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { eq, and, gte, lte, ilike, or, desc, getTableColumns, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, ilike, or, desc, asc, getTableColumns, sql } from 'drizzle-orm';
 import { db, pool } from '../db/index.js';
-import { properties as propsTable, users, ciudades } from '../db/schema.js';
+import { properties as propsTable, users, ciudades, propertyImages } from '../db/schema.js';
 import { authRequired, requireRole } from '../middleware/auth.js';
 import { validate, propertySchema } from '../middleware/validate.js';
+import { deleteCloudinaryImage } from '../services/cloudinary.js';
 
 const router = Router();
 const wrap = fn => (req, res, next) => fn(req, res, next).catch(next);
@@ -205,7 +206,70 @@ router.get('/:id', wrap(async (req, res) => {
     .innerJoin(users, eq(users.id, propsTable.user_id))
     .where(eq(propsTable.id, id));
   if (!row) return res.status(404).json({ error: 'no encontrada' });
-  res.json({ property: row });
+  const images = await db
+    .select()
+    .from(propertyImages)
+    .where(eq(propertyImages.property_id, id))
+    .orderBy(asc(propertyImages.orden), asc(propertyImages.created_at));
+  res.json({ property: { ...row, images } });
+}));
+
+// ── POST /:id/images — registra URL de Cloudinary ya subida ──────────────────
+router.post('/:id/images', authRequired, wrap(async (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'id inválido' });
+
+  const { url, public_id } = req.body;
+  if (!url || !public_id) return res.status(400).json({ error: 'url y public_id son requeridos' });
+
+  const [prop] = await db.select({ user_id: propsTable.user_id, imagen: propsTable.imagen })
+    .from(propsTable).where(eq(propsTable.id, id));
+  if (!prop) return res.status(404).json({ error: 'no encontrada' });
+  if (prop.user_id !== req.user.id && req.user.rol !== 'admin') return res.status(403).json({ error: 'sin permisos' });
+
+  const [{ count }] = await db
+    .select({ count: sql`count(*)::int` })
+    .from(propertyImages)
+    .where(eq(propertyImages.property_id, id));
+  if (count >= 10) return res.status(400).json({ error: 'Máximo 10 fotos por propiedad' });
+
+  const [img] = await db.insert(propertyImages)
+    .values({ property_id: id, url, public_id, orden: count })
+    .returning();
+
+  if (count === 0) {
+    await db.update(propsTable).set({ imagen: url }).where(eq(propsTable.id, id));
+  }
+
+  res.json({ image: img });
+}));
+
+// ── DELETE /:id/images/:imageId — elimina imagen de DB y Cloudinary ──────────
+router.delete('/:id/images/:imageId', authRequired, wrap(async (req, res) => {
+  const id      = parseId(req.params.id);
+  const imageId = parseId(req.params.imageId);
+  if (!id || !imageId) return res.status(400).json({ error: 'id inválido' });
+
+  const [prop] = await db.select({ user_id: propsTable.user_id })
+    .from(propsTable).where(eq(propsTable.id, id));
+  if (!prop) return res.status(404).json({ error: 'no encontrada' });
+  if (prop.user_id !== req.user.id && req.user.rol !== 'admin') return res.status(403).json({ error: 'sin permisos' });
+
+  const [img] = await db.select().from(propertyImages)
+    .where(and(eq(propertyImages.id, imageId), eq(propertyImages.property_id, id)));
+  if (!img) return res.status(404).json({ error: 'imagen no encontrada' });
+
+  await db.delete(propertyImages).where(eq(propertyImages.id, imageId));
+  deleteCloudinaryImage(img.public_id).catch(() => {});
+
+  const [next] = await db.select({ url: propertyImages.url })
+    .from(propertyImages)
+    .where(eq(propertyImages.property_id, id))
+    .orderBy(asc(propertyImages.orden), asc(propertyImages.created_at))
+    .limit(1);
+  await db.update(propsTable).set({ imagen: next?.url ?? null }).where(eq(propsTable.id, id));
+
+  res.json({ ok: true });
 }));
 
 // ── POST / — crear propiedad (Drizzle ORM) ────────────────────────────────────
@@ -293,7 +357,10 @@ router.delete('/:id', authRequired, wrap(async (req, res) => {
   if (existing.user_id !== req.user.id && req.user.rol !== 'admin') {
     return res.status(403).json({ error: 'sin permisos' });
   }
+  const imgs = await db.select({ public_id: propertyImages.public_id })
+    .from(propertyImages).where(eq(propertyImages.property_id, id));
   await db.delete(propsTable).where(eq(propsTable.id, id));
+  for (const img of imgs) deleteCloudinaryImage(img.public_id).catch(() => {});
   res.json({ ok: true });
 }));
 
