@@ -46,6 +46,20 @@ async function main() {
   await migrate(db, { migrationsFolder: path.join(__dirname, 'db/migrations') });
   logger.info('migraciones OK');
 
+  // Garantiza property_images aunque la migración haya fallado silenciosamente
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "property_images" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "property_id" integer NOT NULL REFERENCES "properties"("id") ON DELETE CASCADE,
+      "url" text NOT NULL,
+      "public_id" text NOT NULL,
+      "orden" integer DEFAULT 0 NOT NULL,
+      "created_at" timestamp DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS "idx_property_images_property_id" ON "property_images" ("property_id")`);
+  logger.info('[db] property_images OK');
+
   await initDb();
 
   const server = app.listen(PORT, () =>
